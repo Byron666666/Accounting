@@ -122,6 +122,95 @@
         </aside>
       </section>
 
+      <section class="analytics-panel" aria-label="收支分析">
+        <div class="panel-header analytics-header">
+          <div>
+            <p class="section-kicker">分析洞察</p>
+            <h2>月底預測、異常提醒與預算建議</h2>
+            <p>依據目前瀏覽器內的記帳資料估算，不會上傳任何資料。</p>
+          </div>
+          <span class="analysis-status" id="analysisStatus" aria-live="polite">正在計算</span>
+        </div>
+
+        <div class="forecast-grid">
+          <article class="forecast-card">
+            <span>月底預測收入</span>
+            <strong id="forecastIncome">$0</strong>
+            <small id="forecastIncomeNote">新增紀錄後會開始估算。</small>
+          </article>
+          <article class="forecast-card expense">
+            <span>月底預測支出</span>
+            <strong id="forecastExpense">$0</strong>
+            <small id="forecastExpenseNote">新增紀錄後會開始估算。</small>
+          </article>
+          <article class="forecast-card balance">
+            <span>月底預測結餘</span>
+            <strong id="forecastBalance">$0</strong>
+            <small id="forecastBalanceNote">依收入與支出預測計算。</small>
+          </article>
+        </div>
+
+        <div class="insight-grid">
+          <section class="insight-card">
+            <div class="insight-heading">
+              <h3>異常支出提醒</h3>
+              <span>和過去月份平均比較</span>
+            </div>
+            <div class="insight-list" id="anomalyList"></div>
+          </section>
+
+          <section class="insight-card">
+            <div class="insight-heading">
+              <h3>預算建議</h3>
+              <span>用近幾個月消費估算</span>
+            </div>
+            <div class="insight-list" id="budgetList"></div>
+          </section>
+        </div>
+
+        <div class="chart-grid">
+          <section class="chart-card">
+            <div class="chart-heading">
+              <div>
+                <h3>每日收支趨勢</h3>
+                <p id="trendChartNote">每日收入與支出的折線圖。</p>
+              </div>
+              <div class="chart-tools">
+                <button
+                  class="expand-button"
+                  id="trendRangeToggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-label="展開為近一年的每日收支趨勢"
+                >
+                  <span aria-hidden="true">+</span>
+                  放大 1 年
+                </button>
+                <div class="chart-legend" aria-hidden="true">
+                  <span class="legend-dot income"></span>收入
+                  <span class="legend-dot expense"></span>支出
+                </div>
+              </div>
+            </div>
+            <canvas id="trendChart" width="760" height="320" role="img" aria-label="每日收入與支出折線圖"></canvas>
+          </section>
+
+          <section class="chart-card">
+            <div class="chart-heading">
+              <div>
+                <h3>本月支出柏拉圖</h3>
+                <p id="paretoChartNote">找出本月支出最多的分類。</p>
+              </div>
+              <div class="chart-legend" aria-hidden="true">
+                <span class="legend-bar"></span>金額
+                <span class="legend-line"></span>累積占比
+              </div>
+            </div>
+            <canvas id="paretoChart" width="760" height="320" role="img" aria-label="本月支出分類柏拉圖"></canvas>
+          </section>
+        </div>
+      </section>
+
       <section class="records-panel">
         <div class="panel-header records-header">
           <h2>記帳明細</h2>
