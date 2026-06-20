@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>日常記帳</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar" aria-label="今日概況">
+        <div>
+          <p class="eyebrow">日常記帳</p>
+          <h1>收支總覽</h1>
+          <p class="topbar-copy">把每天的收入、支出和分類整理成一眼看懂的紀錄。</p>
+        </div>
+        <div class="clock-card" aria-live="polite">
+          <span class="clock-label">現在時間</span>
+          <span id="currentDate">--</span>
+          <strong id="currentTime">--:--:--</strong>
+        </div>
+      </section>
+
+      <section class="summary-grid" aria-label="收支摘要">
+        <article class="summary-card income">
+          <span>本月收入</span>
+          <strong id="monthlyIncome">$0</strong>
+        </article>
+        <article class="summary-card expense">
+          <span>本月支出</span>
+          <strong id="monthlyExpense">$0</strong>
+        </article>
+        <article class="summary-card balance">
+          <span>本月結餘</span>
+          <strong id="monthlyBalance">$0</strong>
+        </article>
+        <article class="summary-card total">
+          <span>全部累積</span>
+          <strong id="totalBalance">$0</strong>
+        </article>
+      </section>
+
+      <section class="backup-panel" aria-label="備份與還原">
+        <div>
+          <h2>備份與還原</h2>
+          <p>完整備份會保存所有記帳明細和自訂分類。</p>
+        </div>
+        <div class="backup-actions">
+          <button class="secondary-button" id="exportBackup" type="button">匯出完整備份</button>
+          <label class="file-button">
+            匯入備份
+            <input id="importBackupFile" type="file" accept=".json,application/json" />
+          </label>
+          <span class="backup-status" id="backupStatus" aria-live="polite"></span>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <form class="entry-panel" id="entryForm">
+          <div class="panel-header">
+            <h2>新增紀錄</h2>
+            <div class="type-switch" role="group" aria-label="收支類型">
+              <label>
+                <input type="radio" name="type" value="expense" checked />
+                <span>支出</span>
+              </label>
+              <label>
+                <input type="radio" name="type" value="income" />
+                <span>收入</span>
+              </label>
+            </div>
+          </div>
+
+          <label>
+            日期
+            <input id="entryDate" type="date" required />
+          </label>
+
+          <label>
+            金額
+            <input id="entryAmount" type="number" min="1" step="1" placeholder="例如 350" required />
+          </label>
+
+          <div class="two-col">
+            <label>
+              大項目
+              <select id="mainCategory" required></select>
+            </label>
+            <label>
+              細項
+              <select id="subCategory" required></select>
+            </label>
+          </div>
+
+          <label>
+            備註
+            <input id="entryNote" type="text" maxlength="60" placeholder="早餐、捷運、薪水..." />
+          </label>
+
+          <button class="primary-button" type="submit">加入記帳</button>
+        </form>
+
+        <aside class="category-panel">
+          <div class="panel-header">
+            <h2>分類管理</h2>
+            <button class="ghost-button" id="resetCategories" type="button">還原預設</button>
+          </div>
+
+          <form class="category-form" id="categoryForm">
+            <label>
+              大項目名稱
+              <input id="newMainCategory" type="text" maxlength="16" placeholder="例如 寵物、投資" required />
+            </label>
+            <label>
+              細項名稱
+              <input id="newSubCategory" type="text" maxlength="16" placeholder="例如 飼料、基金" required />
+            </label>
+            <button class="secondary-button" type="submit">新增分類</button>
+          </form>
+
+          <div class="category-list" id="categoryList"></div>
+        </aside>
+      </section>
+
+      <section class="records-panel">
+        <div class="panel-header records-header">
+          <h2>記帳明細</h2>
+          <div class="record-actions">
+            <select id="filterType" aria-label="依收支篩選">
+              <option value="all">全部</option>
+              <option value="expense">支出</option>
+              <option value="income">收入</option>
+            </select>
+            <select id="filterMain" aria-label="依大項目篩選">
+              <option value="all">所有大項目</option>
+            </select>
+            <button class="ghost-button" id="exportCsv" type="button">匯出 CSV</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>類型</th>
+                <th>大項目</th>
+                <th>細項</th>
+                <th>備註</th>
+                <th class="amount-cell">金額</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+          </table>
+          <div class="empty-state" id="emptyState">還沒有紀錄，先新增一筆收支吧。</div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
