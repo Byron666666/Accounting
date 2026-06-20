@@ -55,6 +55,7 @@ const analyticsToggle = document.querySelector("#analyticsToggle");
 const ANALYTICS_PANEL_KEY = "dailyLedgerAnalyticsCollapsed";
 
 let trendRangeDays = 30;
+let activePressTarget = null;
 
 const formatCurrency = new Intl.NumberFormat("zh-TW", {
   style: "currency",
@@ -92,7 +93,29 @@ function init() {
   importBackupFile.addEventListener("change", importBackup);
   trendRangeToggle.addEventListener("click", toggleTrendRange);
   analyticsToggle.addEventListener("click", toggleAnalyticsPanel);
+  setupPressFeedback();
   window.addEventListener("resize", debounce(updateAnalytics, 160));
+}
+
+function setupPressFeedback() {
+  document.addEventListener("pointerdown", (event) => {
+    const target = event.target.closest("button, .file-button");
+    if (!target) return;
+
+    activePressTarget = target;
+    activePressTarget.classList.add("is-pressing");
+  });
+
+  ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+    document.addEventListener(eventName, releasePressFeedback);
+  });
+}
+
+function releasePressFeedback() {
+  if (!activePressTarget) return;
+
+  activePressTarget.classList.remove("is-pressing");
+  activePressTarget = null;
 }
 
 function updateClock() {
@@ -554,8 +577,8 @@ function drawTrendChart(dailySeries) {
 
   drawYAxis(ctx, bounds, chartMax);
   drawXAxis(ctx, bounds, dailySeries.map((day) => day.label));
-  drawLine(ctx, pointsFor("expense"), "#ff7a7a");
-  drawLine(ctx, pointsFor("income"), "#5ff0a2");
+  drawLine(ctx, pointsFor("expense"), getThemeColor("--expense"));
+  drawLine(ctx, pointsFor("income"), getThemeColor("--income"));
 }
 
 function drawParetoChart(expensesByCategory) {
@@ -597,9 +620,9 @@ function drawParetoChart(expensesByCategory) {
     const y = bounds.bottom - barHeight;
     const cumulativeRate = getCumulativeAmount(items, index) / total;
 
-    ctx.fillStyle = "rgba(85, 220, 234, 0.72)";
+    ctx.fillStyle = getThemeColor("--chart-bar");
     ctx.fillRect(x, y, barWidth, barHeight);
-    ctx.fillStyle = "#cfe4ea";
+    ctx.fillStyle = getThemeColor("--chart-muted");
     ctx.font = "11px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(truncateLabel(item.category, 5), xCenter, bounds.bottom + 22);
@@ -612,7 +635,7 @@ function drawParetoChart(expensesByCategory) {
   });
 
   drawPercentAxis(ctx, bounds);
-  drawLine(ctx, cumulativePoints, "#ffd66b", true);
+  drawLine(ctx, cumulativePoints, getThemeColor("--gold"), true);
 }
 
 function getExpenseTotalsByCategory(items) {
@@ -729,6 +752,10 @@ function prepareCanvas(canvas) {
   return { ctx, width, height };
 }
 
+function getThemeColor(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
 function getChartBounds(width, height, hasRightAxis = false) {
   const left = 58;
   const right = width - (hasRightAxis ? 58 : 24);
@@ -747,13 +774,13 @@ function getChartBounds(width, height, hasRightAxis = false) {
 
 function drawChartFrame(ctx, width, height) {
   ctx.clearRect(0, 0, width, height);
-  ctx.fillStyle = "rgba(7, 21, 27, 0.78)";
+  ctx.fillStyle = getThemeColor("--chart-bg");
   ctx.fillRect(0, 0, width, height);
 }
 
 function drawYAxis(ctx, bounds, maxValue) {
-  ctx.strokeStyle = "rgba(184, 201, 210, 0.16)";
-  ctx.fillStyle = "#9fb4bd";
+  ctx.strokeStyle = getThemeColor("--chart-grid");
+  ctx.fillStyle = getThemeColor("--chart-muted");
   ctx.lineWidth = 1;
   ctx.font = "11px sans-serif";
   ctx.textAlign = "right";
@@ -772,7 +799,7 @@ function drawYAxis(ctx, bounds, maxValue) {
 }
 
 function drawXAxis(ctx, bounds, labels) {
-  ctx.fillStyle = "#9fb4bd";
+  ctx.fillStyle = getThemeColor("--chart-muted");
   ctx.font = "11px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
@@ -812,7 +839,7 @@ function getXAxisLabelIndexes(count, bounds) {
 }
 
 function drawPercentAxis(ctx, bounds) {
-  ctx.fillStyle = "#9fb4bd";
+  ctx.fillStyle = getThemeColor("--chart-muted");
   ctx.font = "11px sans-serif";
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
@@ -850,7 +877,7 @@ function drawLine(ctx, points, color, showPercentLabel = false) {
     ctx.fill();
 
     if (showPercentLabel) {
-      ctx.fillStyle = "#ffe69c";
+      ctx.fillStyle = getThemeColor("--gold");
       ctx.font = "11px sans-serif";
       ctx.textAlign = "center";
       ctx.fillText(`${Math.round(point.value * 100)}%`, point.x, point.y - 12);
@@ -859,7 +886,7 @@ function drawLine(ctx, points, color, showPercentLabel = false) {
 }
 
 function drawEmptyChart(ctx, width, height, message) {
-  ctx.fillStyle = "#9fb4bd";
+  ctx.fillStyle = getThemeColor("--chart-muted");
   ctx.font = "14px sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
