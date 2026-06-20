@@ -122,17 +122,29 @@
         </aside>
       </section>
 
-      <section class="analytics-panel" aria-label="收支分析">
+      <section class="analytics-panel" id="analyticsPanel" aria-label="收支分析">
         <div class="panel-header analytics-header">
           <div>
             <p class="section-kicker">分析洞察</p>
             <h2>月底預測、異常提醒與預算建議</h2>
             <p>依據目前瀏覽器內的記帳資料估算，不會上傳任何資料。</p>
           </div>
-          <span class="analysis-status" id="analysisStatus" aria-live="polite">正在計算</span>
+          <div class="analytics-actions">
+            <span class="analysis-status" id="analysisStatus" aria-live="polite">正在計算</span>
+            <button
+              class="collapse-button"
+              id="analyticsToggle"
+              type="button"
+              aria-expanded="true"
+              aria-controls="analyticsContent"
+            >
+              收合分析
+            </button>
+          </div>
         </div>
 
-        <div class="forecast-grid">
+        <div class="analytics-content" id="analyticsContent">
+          <div class="forecast-grid">
           <article class="forecast-card">
             <span>月底預測收入</span>
             <strong id="forecastIncome">$0</strong>
@@ -208,6 +220,7 @@
             </div>
             <canvas id="paretoChart" width="760" height="320" role="img" aria-label="本月支出分類柏拉圖"></canvas>
           </section>
+        </div>
         </div>
       </section>
 

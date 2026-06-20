@@ -571,6 +571,38 @@ select:focus {
   align-items: flex-start;
 }
 
+.analytics-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.collapse-button {
+  min-height: 34px;
+  border: 1px solid rgba(85, 220, 234, 0.3);
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--button-text);
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.collapse-button:hover {
+  background: var(--brand-dark);
+  transform: translateY(-1px);
+}
+
+.analytics-panel.is-collapsed .analytics-header {
+  margin-bottom: 0;
+}
+
+.analytics-content[hidden] {
+  display: none;
+}
+
 .analytics-header p:not(.section-kicker) {
   margin: 7px 0 0;
   color: var(--muted);
@@ -1058,6 +1090,8 @@ tbody tr:last-child td {
 
   .record-actions,
   .backup-actions,
+  .analytics-actions,
+  .collapse-button,
   .chart-tools,
   .expand-button,
   .chart-legend,

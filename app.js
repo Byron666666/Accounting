@@ -48,6 +48,11 @@ const paretoChart = document.querySelector("#paretoChart");
 const trendChartNote = document.querySelector("#trendChartNote");
 const paretoChartNote = document.querySelector("#paretoChartNote");
 const trendRangeToggle = document.querySelector("#trendRangeToggle");
+const analyticsPanel = document.querySelector("#analyticsPanel");
+const analyticsContent = document.querySelector("#analyticsContent");
+const analyticsToggle = document.querySelector("#analyticsToggle");
+
+const ANALYTICS_PANEL_KEY = "dailyLedgerAnalyticsCollapsed";
 
 let trendRangeDays = 30;
 
@@ -74,6 +79,7 @@ function init() {
   renderRecords();
   updateSummary();
   updateAnalytics();
+  restoreAnalyticsPanelState();
 
   mainCategory.addEventListener("change", () => renderSubCategoryOptions());
   entryForm.addEventListener("submit", addRecord);
@@ -85,6 +91,7 @@ function init() {
   exportBackup.addEventListener("click", downloadBackup);
   importBackupFile.addEventListener("change", importBackup);
   trendRangeToggle.addEventListener("click", toggleTrendRange);
+  analyticsToggle.addEventListener("click", toggleAnalyticsPanel);
   window.addEventListener("resize", debounce(updateAnalytics, 160));
 }
 
@@ -321,6 +328,28 @@ function updateTrendToggle() {
     <span aria-hidden="true">${isExpanded ? "-" : "+"}</span>
     ${isExpanded ? "收回 1 個月" : "放大 1 年"}
   `;
+}
+
+function restoreAnalyticsPanelState() {
+  const collapsed = localStorage.getItem(ANALYTICS_PANEL_KEY) === "true";
+  setAnalyticsPanelCollapsed(collapsed);
+}
+
+function toggleAnalyticsPanel() {
+  const shouldCollapse = analyticsToggle.getAttribute("aria-expanded") === "true";
+  setAnalyticsPanelCollapsed(shouldCollapse);
+
+  if (!shouldCollapse) {
+    requestAnimationFrame(updateAnalytics);
+  }
+}
+
+function setAnalyticsPanelCollapsed(collapsed) {
+  analyticsContent.hidden = collapsed;
+  analyticsPanel.classList.toggle("is-collapsed", collapsed);
+  analyticsToggle.setAttribute("aria-expanded", String(!collapsed));
+  analyticsToggle.textContent = collapsed ? "展開分析" : "收合分析";
+  localStorage.setItem(ANALYTICS_PANEL_KEY, String(collapsed));
 }
 
 function calculateForecast(monthlySeries, currentMonthRecords, today) {
