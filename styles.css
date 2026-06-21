@@ -32,9 +32,14 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at 12% 0%, rgba(15, 139, 141, 0.13), transparent 30%),
     radial-gradient(circle at 86% 8%, rgba(21, 128, 61, 0.1), transparent 28%),
@@ -53,6 +58,8 @@ select {
 
 button {
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button:disabled {
@@ -363,6 +370,7 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .category-content[hidden],
@@ -386,6 +394,7 @@ h2 {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .backup-status {
@@ -410,6 +419,15 @@ h2 {
   align-items: start;
 }
 
+.workspace > *,
+.investment-layout > *,
+.investment-summary-grid > *,
+.forecast-grid > *,
+.insight-grid > *,
+.chart-grid > * {
+  min-width: 0;
+}
+
 .entry-panel,
 .category-panel,
 .analytics-panel,
@@ -429,6 +447,10 @@ h2 {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.panel-header > * {
+  min-width: 0;
 }
 
 .entry-panel .panel-header {
@@ -551,8 +573,13 @@ select:focus {
 .expand-button,
 .collapse-button,
 .delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
   font-weight: 900;
+  text-align: center;
+  line-height: 1.25;
   will-change: transform;
 }
 
@@ -633,6 +660,7 @@ button.is-pressing,
   max-height: 356px;
   overflow: auto;
   padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .category-group {
@@ -649,6 +677,7 @@ button.is-pressing,
   gap: 10px;
   margin-bottom: 9px;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .category-group strong span {
@@ -666,6 +695,7 @@ button.is-pressing,
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  max-width: 100%;
   padding: 6px 10px;
   border: 1px solid rgba(15, 139, 141, 0.18);
   border-radius: 999px;
@@ -673,6 +703,7 @@ button.is-pressing,
   color: var(--brand-dark);
   font-size: 0.84rem;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .category-tag {
@@ -873,10 +904,11 @@ button.is-pressing,
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .collapse-button {
-  min-height: 34px;
+  min-height: 44px;
   border: 0;
   background: var(--brand);
   color: var(--button-text);
@@ -1207,6 +1239,7 @@ button.is-pressing,
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .record-actions select {
@@ -1216,9 +1249,11 @@ button.is-pressing,
 
 .table-wrap {
   position: relative;
+  max-width: 100%;
   overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -1396,6 +1431,18 @@ tbody tr:last-child td {
     padding: 22px;
   }
 
+  .type-switch {
+    width: 100%;
+  }
+
+  .type-switch label {
+    flex: 1 1 0;
+  }
+
+  .type-switch span {
+    min-width: 0;
+  }
+
   .clock-card {
     min-width: 0;
     text-align: left;
@@ -1405,6 +1452,8 @@ tbody tr:last-child td {
   .backup-actions,
   .category-actions,
   .analytics-actions,
+  .analysis-status,
+  .market-status,
   .market-tools button,
   .collapse-button,
   .chart-tools,
@@ -1429,6 +1478,11 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 520px) {
+  .app-shell {
+    width: 100%;
+    padding: 12px 12px 36px;
+  }
+
   .summary-grid,
   .two-col,
   .three-col {
@@ -1436,7 +1490,11 @@ tbody tr:last-child td {
   }
 
   h1 {
-    font-size: 2rem;
+    font-size: 1.86rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
   }
 
   .entry-panel,
@@ -1450,7 +1508,32 @@ tbody tr:last-child td {
   }
 
   .summary-card {
-    min-height: 108px;
+    min-height: 98px;
+  }
+
+  .summary-card strong {
+    font-size: 1.5rem;
+  }
+
+  .category-list {
+    max-height: 62vh;
+    padding-right: 0;
+  }
+
+  .analysis-status,
+  .market-status,
+  .chart-legend {
+    justify-content: center;
+    white-space: normal;
+  }
+
+  .table-wrap table,
+  table {
+    min-width: 660px;
+  }
+
+  .investment-table-wrap table {
+    min-width: 920px;
   }
 
   .chart-card canvas {

@@ -100,7 +100,6 @@ const formatCurrency = new Intl.NumberFormat("zh-TW", {
 });
 
 const compactCurrency = new Intl.NumberFormat("zh-TW", {
-  notation: "compact",
   maximumFractionDigits: 1
 });
 
@@ -145,36 +144,73 @@ function init() {
   entryForm.addEventListener("submit", addRecord);
   investmentForm.addEventListener("submit", addInvestmentRecord);
   categoryForm.addEventListener("submit", addCategory);
-  recordsToggle.addEventListener("click", toggleRecordsPanel);
+  bindTap(recordsToggle, toggleRecordsPanel);
   filterType.addEventListener("change", renderRecords);
   filterMain.addEventListener("change", renderRecords);
-  resetCategories.addEventListener("click", restoreDefaultCategories);
-  categoryToggle.addEventListener("click", toggleCategoryPanel);
-  exportCsv.addEventListener("click", downloadCsv);
-  exportBackup.addEventListener("click", downloadBackup);
+  bindTap(resetCategories, restoreDefaultCategories);
+  bindTap(categoryToggle, toggleCategoryPanel);
+  bindTap(exportCsv, downloadCsv);
+  bindTap(exportBackup, downloadBackup);
   importBackupFile.addEventListener("change", importBackup);
   investmentMarket.addEventListener("change", syncMarketPlaceholders);
-  saveMarketApiKey.addEventListener("click", saveMarketApiKeyValue);
-  refreshMarketPrices.addEventListener("click", () => refreshMarketPricesFromApi());
-  trendRangeToggle.addEventListener("click", toggleTrendRange);
-  analyticsToggle.addEventListener("click", toggleAnalyticsPanel);
-  investmentToggle.addEventListener("click", toggleInvestmentPanel);
+  bindTap(saveMarketApiKey, saveMarketApiKeyValue);
+  bindTap(refreshMarketPrices, () => refreshMarketPricesFromApi());
+  bindTap(trendRangeToggle, toggleTrendRange);
+  bindTap(analyticsToggle, toggleAnalyticsPanel);
+  bindTap(investmentToggle, toggleInvestmentPanel);
   setupPressFeedback();
   window.addEventListener("resize", debounce(updateAnalytics, 160));
+  window.addEventListener("orientationchange", debounce(updateAnalytics, 220));
+}
+
+function bindTap(element, handler) {
+  let lastTouchAt = 0;
+
+  element.addEventListener("touchend", (event) => {
+    if (element.disabled) return;
+
+    lastTouchAt = Date.now();
+    event.preventDefault();
+    handler(event);
+  }, { passive: false });
+
+  element.addEventListener("click", (event) => {
+    if (element.disabled || Date.now() - lastTouchAt < 450) return;
+    handler(event);
+  });
 }
 
 function setupPressFeedback() {
   document.addEventListener("pointerdown", (event) => {
-    const target = event.target.closest("button, .file-button");
+    const target = getClosestActionTarget(event.target);
     if (!target) return;
 
     activePressTarget = target;
     activePressTarget.classList.add("is-pressing");
   });
 
-  ["pointerup", "pointercancel", "pointerleave"].forEach((eventName) => {
+  document.addEventListener("touchstart", (event) => {
+    const target = getClosestActionTarget(event.target);
+    if (!target) return;
+
+    activePressTarget = target;
+    activePressTarget.classList.add("is-pressing");
+  }, { passive: true });
+
+  ["pointerup", "pointercancel", "pointerleave", "touchend", "touchcancel"].forEach((eventName) => {
     document.addEventListener(eventName, releasePressFeedback);
   });
+}
+
+function getClosestActionTarget(target) {
+  let element = target && target.nodeType === 1 ? target : target && target.parentElement;
+
+  while (element && element !== document) {
+    if (element.matches && element.matches("button, .file-button")) return element;
+    element = element.parentElement;
+  }
+
+  return null;
 }
 
 function releasePressFeedback() {
@@ -219,7 +255,7 @@ function ensureCategoryFallbacks() {
 }
 
 function syncCategoryWithType() {
-  const type = new FormData(entryForm).get("type");
+  const type = getSelectedEntryType();
 
   if (type === "income" && categories["收入"]) {
     renderCategoryOptions("收入");
@@ -229,6 +265,11 @@ function syncCategoryWithType() {
   if (type === "expense" && ["投資", "收入"].includes(mainCategory.value)) {
     renderCategoryOptions(categories["餐飲"] ? "餐飲" : Object.keys(categories)[0]);
   }
+}
+
+function getSelectedEntryType() {
+  const checkedType = entryForm.querySelector('input[name="type"]:checked');
+  return checkedType ? checkedType.value : "expense";
 }
 
 function updateClock() {
@@ -250,7 +291,7 @@ function updateClock() {
 function addRecord(event) {
   event.preventDefault();
 
-  const type = new FormData(entryForm).get("type");
+  const type = getSelectedEntryType();
   const amount = Number(entryAmount.value);
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -788,10 +829,10 @@ async function fetchFinMindQuote(symbol, token) {
 
   const data = await response.json();
   const rows = Array.isArray(data.data) ? data.data : [];
-  const latest = rows
+  const sortedRows = rows
     .filter((item) => Number(item.close) > 0)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
-    .at(-1);
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const latest = sortedRows[sortedRows.length - 1];
 
   if (!latest) {
     throw new Error(data.msg || "FinMind 沒有取得有效市價。");
@@ -833,7 +874,7 @@ async function fetchAlphaVantageQuote(symbol, key) {
   }
 
   const quote = data["Global Quote"];
-  const price = Number(quote?.["05. price"]);
+  const price = quote ? Number(quote["05. price"]) : NaN;
 
   if (!quote || !Number.isFinite(price) || price <= 0) {
     throw new Error(data.Information || "Alpha Vantage 沒有取得有效市價。");
@@ -1207,7 +1248,10 @@ function renderBudgetSuggestions(today) {
 function drawTrendChart(dailySeries) {
   const canvasState = prepareCanvas(trendChart);
   const { ctx, width, height } = canvasState;
-  const values = dailySeries.flatMap((day) => [day.income, day.expense]);
+  const values = dailySeries.reduce((all, day) => {
+    all.push(day.income, day.expense);
+    return all;
+  }, []);
   const maxValue = Math.max(...values);
 
   drawChartFrame(ctx, width, height);
@@ -1560,7 +1604,18 @@ function getCumulativeAmount(items, index) {
 }
 
 function formatCompactCurrency(value) {
-  return `$${compactCurrency.format(Math.round(value))}`;
+  const rounded = Math.round(value);
+  const abs = Math.abs(rounded);
+
+  if (abs >= 100000000) {
+    return `$${compactCurrency.format(Math.round((rounded / 100000000) * 10) / 10)}億`;
+  }
+
+  if (abs >= 10000) {
+    return `$${compactCurrency.format(Math.round((rounded / 10000) * 10) / 10)}萬`;
+  }
+
+  return `$${compactCurrency.format(rounded)}`;
 }
 
 function truncateLabel(value, length) {
