@@ -1,5 +1,8 @@
 const STORAGE_KEY = "dailyLedgerRecords";
 const CATEGORY_KEY = "dailyLedgerCategories";
+const FINMIND_TOKEN_KEY = "dailyLedgerFinMindToken";
+const ALPHA_VANTAGE_KEY = "dailyLedgerAlphaVantageKey";
+const MARKET_REFRESH_INTERVAL = 30 * 60 * 1000;
 
 const defaultCategories = {
   餐飲: ["早餐", "午餐", "晚餐", "飲料", "聚餐"],
@@ -7,7 +10,8 @@ const defaultCategories = {
   生活: ["日用品", "房租", "水電瓦斯", "電話網路", "維修"],
   娛樂: ["電影", "遊戲", "旅遊", "訂閱", "活動"],
   醫療: ["看診", "藥品", "保健", "保險"],
-  收入: ["薪資", "獎金", "投資", "兼職", "其他收入"]
+  收入: ["薪資", "獎金", "兼職", "投資收益", "其他收入"],
+  投資: ["股票", "ETF", "基金", "債券", "加密貨幣", "定期定額"]
 };
 
 const records = loadJSON(STORAGE_KEY, []);
@@ -18,6 +22,9 @@ const currentTime = document.querySelector("#currentTime");
 const entryForm = document.querySelector("#entryForm");
 const categoryForm = document.querySelector("#categoryForm");
 const categoryList = document.querySelector("#categoryList");
+const categoryPanel = document.querySelector("#categoryPanel");
+const categoryContent = document.querySelector("#categoryContent");
+const categoryToggle = document.querySelector("#categoryToggle");
 const entryDate = document.querySelector("#entryDate");
 const entryAmount = document.querySelector("#entryAmount");
 const entryNote = document.querySelector("#entryNote");
@@ -28,12 +35,34 @@ const newSubCategory = document.querySelector("#newSubCategory");
 const filterType = document.querySelector("#filterType");
 const filterMain = document.querySelector("#filterMain");
 const recordsBody = document.querySelector("#recordsBody");
+const recordsPanel = document.querySelector("#recordsPanel");
+const recordsContent = document.querySelector("#recordsContent");
+const recordsToggle = document.querySelector("#recordsToggle");
 const emptyState = document.querySelector("#emptyState");
 const resetCategories = document.querySelector("#resetCategories");
 const exportCsv = document.querySelector("#exportCsv");
 const exportBackup = document.querySelector("#exportBackup");
 const importBackupFile = document.querySelector("#importBackupFile");
 const backupStatus = document.querySelector("#backupStatus");
+const investmentForm = document.querySelector("#investmentForm");
+const investmentMarket = document.querySelector("#investmentMarket");
+const investmentDate = document.querySelector("#investmentDate");
+const investmentAmount = document.querySelector("#investmentAmount");
+const investmentMarketPrice = document.querySelector("#investmentMarketPrice");
+const investmentCategory = document.querySelector("#investmentCategory");
+const investmentSymbol = document.querySelector("#investmentSymbol");
+const investmentQuantity = document.querySelector("#investmentQuantity");
+const investmentNote = document.querySelector("#investmentNote");
+const portfolioBody = document.querySelector("#portfolioBody");
+const portfolioEmptyState = document.querySelector("#portfolioEmptyState");
+const investmentCount = document.querySelector("#investmentCount");
+const currentMarketValue = document.querySelector("#currentMarketValue");
+const unrealizedGain = document.querySelector("#unrealizedGain");
+const finmindToken = document.querySelector("#finmindToken");
+const alphaVantageKey = document.querySelector("#alphaVantageKey");
+const saveMarketApiKey = document.querySelector("#saveMarketApiKey");
+const refreshMarketPrices = document.querySelector("#refreshMarketPrices");
+const marketStatus = document.querySelector("#marketStatus");
 const analysisStatus = document.querySelector("#analysisStatus");
 const forecastIncome = document.querySelector("#forecastIncome");
 const forecastExpense = document.querySelector("#forecastExpense");
@@ -51,11 +80,18 @@ const trendRangeToggle = document.querySelector("#trendRangeToggle");
 const analyticsPanel = document.querySelector("#analyticsPanel");
 const analyticsContent = document.querySelector("#analyticsContent");
 const analyticsToggle = document.querySelector("#analyticsToggle");
+const investmentPanel = document.querySelector(".investment-panel");
+const investmentContent = document.querySelector("#investmentContent");
+const investmentToggle = document.querySelector("#investmentToggle");
 
 const ANALYTICS_PANEL_KEY = "dailyLedgerAnalyticsCollapsed";
+const INVESTMENT_PANEL_KEY = "dailyLedgerInvestmentCollapsed";
+const CATEGORY_PANEL_KEY = "dailyLedgerCategoryCollapsed";
+const RECORDS_PANEL_KEY = "dailyLedgerRecordsCollapsed";
 
 let trendRangeDays = 30;
 let activePressTarget = null;
+let marketRefreshTimer = null;
 
 const formatCurrency = new Intl.NumberFormat("zh-TW", {
   style: "currency",
@@ -68,31 +104,61 @@ const compactCurrency = new Intl.NumberFormat("zh-TW", {
   maximumFractionDigits: 1
 });
 
+const marketCurrency = new Intl.NumberFormat("zh-TW", {
+  maximumFractionDigits: 2
+});
+
+const quantityFormatter = new Intl.NumberFormat("zh-TW", {
+  maximumFractionDigits: 6
+});
+
+migrateCategories();
 init();
 
 function init() {
   entryDate.value = toDateInputValue(new Date());
+  investmentDate.value = toDateInputValue(new Date());
   updateClock();
   setInterval(updateClock, 1000);
 
   renderCategoryOptions();
+  finmindToken.value = getFinMindToken();
+  alphaVantageKey.value = getAlphaVantageKey();
+  syncMarketPlaceholders();
+  renderInvestmentOptions();
   renderCategoryList();
   renderRecords();
+  renderPortfolio();
   updateSummary();
   updateAnalytics();
   restoreAnalyticsPanelState();
+  restoreInvestmentPanelState();
+  restoreCategoryPanelState();
+  restoreRecordsPanelState();
+  updateMarketStatus();
+  scheduleAutomaticMarketRefresh();
 
   mainCategory.addEventListener("change", () => renderSubCategoryOptions());
+  entryForm.querySelectorAll('input[name="type"]').forEach((input) => {
+    input.addEventListener("change", syncCategoryWithType);
+  });
   entryForm.addEventListener("submit", addRecord);
+  investmentForm.addEventListener("submit", addInvestmentRecord);
   categoryForm.addEventListener("submit", addCategory);
+  recordsToggle.addEventListener("click", toggleRecordsPanel);
   filterType.addEventListener("change", renderRecords);
   filterMain.addEventListener("change", renderRecords);
   resetCategories.addEventListener("click", restoreDefaultCategories);
+  categoryToggle.addEventListener("click", toggleCategoryPanel);
   exportCsv.addEventListener("click", downloadCsv);
   exportBackup.addEventListener("click", downloadBackup);
   importBackupFile.addEventListener("change", importBackup);
+  investmentMarket.addEventListener("change", syncMarketPlaceholders);
+  saveMarketApiKey.addEventListener("click", saveMarketApiKeyValue);
+  refreshMarketPrices.addEventListener("click", () => refreshMarketPricesFromApi());
   trendRangeToggle.addEventListener("click", toggleTrendRange);
   analyticsToggle.addEventListener("click", toggleAnalyticsPanel);
+  investmentToggle.addEventListener("click", toggleInvestmentPanel);
   setupPressFeedback();
   window.addEventListener("resize", debounce(updateAnalytics, 160));
 }
@@ -116,6 +182,53 @@ function releasePressFeedback() {
 
   activePressTarget.classList.remove("is-pressing");
   activePressTarget = null;
+}
+
+function migrateCategories() {
+  let changed = false;
+
+  if (!categories["投資"]) {
+    categories["投資"] = cloneData(defaultCategories["投資"]);
+    changed = true;
+  }
+
+  if (Array.isArray(categories["收入"]) && categories["收入"].includes("投資")) {
+    categories["收入"] = categories["收入"].filter((sub) => sub !== "投資");
+
+    if (!categories["收入"].includes("投資收益")) {
+      categories["收入"].push("投資收益");
+    }
+
+    changed = true;
+  }
+
+  if (changed) {
+    saveCategories();
+  }
+}
+
+function ensureCategoryFallbacks() {
+  if (!categories["投資"] || categories["投資"].length === 0) {
+    categories["投資"] = ["其他投資"];
+  }
+
+  const entryMains = Object.keys(categories).filter((category) => category !== "投資");
+  if (entryMains.length === 0) {
+    categories["其他"] = ["其他"];
+  }
+}
+
+function syncCategoryWithType() {
+  const type = new FormData(entryForm).get("type");
+
+  if (type === "income" && categories["收入"]) {
+    renderCategoryOptions("收入");
+    return;
+  }
+
+  if (type === "expense" && ["投資", "收入"].includes(mainCategory.value)) {
+    renderCategoryOptions(categories["餐飲"] ? "餐飲" : Object.keys(categories)[0]);
+  }
 }
 
 function updateClock() {
@@ -163,6 +276,62 @@ function addRecord(event) {
   updateAnalytics();
 }
 
+function addInvestmentRecord(event) {
+  event.preventDefault();
+
+  const amount = Number(investmentAmount.value);
+  const market = normalizeInvestmentMarket(investmentMarket.value, investmentSymbol.value);
+  const symbol = getCanonicalMarketSymbol(investmentSymbol.value, market);
+  const quantity = Number(investmentQuantity.value);
+  const marketPrice = normalizeOptionalPositiveNumber(investmentMarketPrice.value);
+
+  if (!symbol) {
+    investmentSymbol.focus();
+    return;
+  }
+
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    investmentQuantity.focus();
+    return;
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    investmentAmount.focus();
+    return;
+  }
+
+  records.unshift({
+    id: createId(),
+    type: "investment",
+    date: investmentDate.value,
+    amount,
+    main: "投資",
+    sub: investmentCategory.value,
+    market,
+    symbol,
+    quantity,
+    marketPrice,
+    marketUpdatedAt: marketPrice === null ? "" : new Date().toISOString(),
+    marketDate: "",
+    note: investmentNote.value.trim()
+  });
+
+  saveRecords();
+  investmentAmount.value = "";
+  investmentMarketPrice.value = "";
+  investmentSymbol.value = "";
+  investmentQuantity.value = "";
+  investmentNote.value = "";
+  renderRecords();
+  renderPortfolio();
+  updateSummary();
+  updateAnalytics();
+
+  if (marketPrice === null) {
+    refreshMarketPricesFromApi({ targets: [{ market, symbol }], silent: true });
+  }
+}
+
 function addCategory(event) {
   event.preventDefault();
 
@@ -182,6 +351,7 @@ function addCategory(event) {
   saveCategories();
   categoryForm.reset();
   renderCategoryOptions(main, sub);
+  renderInvestmentOptions(main === "投資" ? sub : undefined);
   renderCategoryList();
 }
 
@@ -189,23 +359,35 @@ function restoreDefaultCategories() {
   categories = cloneData(defaultCategories);
   saveCategories();
   renderCategoryOptions();
+  renderInvestmentOptions();
   renderCategoryList();
 }
 
 function renderCategoryOptions(selectedMain = mainCategory.value, selectedSub = subCategory.value) {
-  const mains = Object.keys(categories);
+  ensureCategoryFallbacks();
+  const entryMains = Object.keys(categories).filter((category) => category !== "投資");
+  const filterMains = Object.keys(categories);
 
-  mainCategory.innerHTML = mains
+  mainCategory.innerHTML = entryMains
     .map((category) => `<option value="${escapeHTML(category)}">${escapeHTML(category)}</option>`)
     .join("");
 
   filterMain.innerHTML = [
     '<option value="all">所有大項目</option>',
-    ...mains.map((category) => `<option value="${escapeHTML(category)}">${escapeHTML(category)}</option>`)
+    ...filterMains.map((category) => `<option value="${escapeHTML(category)}">${escapeHTML(category)}</option>`)
   ].join("");
 
-  mainCategory.value = mains.includes(selectedMain) ? selectedMain : mains[0];
+  mainCategory.value = entryMains.includes(selectedMain) ? selectedMain : entryMains[0];
   renderSubCategoryOptions(selectedSub);
+}
+
+function renderInvestmentOptions(selectedSub = investmentCategory.value) {
+  ensureCategoryFallbacks();
+  const subs = categories["投資"] || defaultCategories["投資"];
+  investmentCategory.innerHTML = subs
+    .map((category) => `<option value="${escapeHTML(category)}">${escapeHTML(category)}</option>`)
+    .join("");
+  investmentCategory.value = subs.includes(selectedSub) ? selectedSub : subs[0];
 }
 
 function renderSubCategoryOptions(selectedSub = subCategory.value) {
@@ -217,9 +399,25 @@ function renderSubCategoryOptions(selectedSub = subCategory.value) {
 }
 
 function renderCategoryList() {
+  ensureCategoryFallbacks();
   categoryList.innerHTML = Object.entries(categories)
     .map(([main, subs]) => {
-      const tags = subs.map((sub) => `<span class="tag">${escapeHTML(sub)}</span>`).join("");
+      const tags = subs
+        .map(
+          (sub) => `
+            <span class="tag category-tag">
+              <span>${escapeHTML(sub)}</span>
+              <button
+                class="category-delete"
+                type="button"
+                data-main="${escapeHTML(main)}"
+                data-sub="${escapeHTML(sub)}"
+                aria-label="刪除 ${escapeHTML(main)} 的 ${escapeHTML(sub)}"
+              >×</button>
+            </span>
+          `
+        )
+        .join("");
       return `
         <section class="category-group">
           <strong>
@@ -231,6 +429,30 @@ function renderCategoryList() {
       `;
     })
     .join("");
+
+  categoryList.querySelectorAll(".category-delete").forEach((button) => {
+    button.addEventListener("click", () => deleteCategory(button.dataset.main, button.dataset.sub));
+  });
+}
+
+function deleteCategory(main, sub) {
+  if (!categories[main]) return;
+
+  categories[main] = categories[main].filter((item) => item !== sub);
+
+  if (categories[main].length === 0) {
+    if (main === "投資") {
+      categories[main] = ["其他投資"];
+    } else {
+      delete categories[main];
+    }
+  }
+
+  ensureCategoryFallbacks();
+  saveCategories();
+  renderCategoryOptions();
+  renderInvestmentOptions();
+  renderCategoryList();
 }
 
 function renderRecords() {
@@ -242,16 +464,16 @@ function renderRecords() {
 
   recordsBody.innerHTML = filteredRecords
     .map((record) => {
-      const amountClass = record.type === "income" ? "income-text" : "expense-text";
-      const typeLabel = record.type === "income" ? "收入" : "支出";
-      const sign = record.type === "income" ? "+" : "-";
+      const amountClass = getAmountClass(record.type);
+      const typeLabel = getTypeLabel(record.type);
+      const sign = getAmountSign(record.type);
       return `
         <tr>
           <td>${escapeHTML(record.date)}</td>
           <td><span class="type-pill ${record.type}">${typeLabel}</span></td>
           <td>${escapeHTML(record.main)}</td>
           <td>${escapeHTML(record.sub)}</td>
-          <td>${escapeHTML(record.note || "-")}</td>
+          <td>${escapeHTML(getRecordNote(record))}</td>
           <td class="amount-cell ${amountClass}">${sign}${formatCurrency.format(record.amount)}</td>
           <td><button class="delete-button" type="button" data-id="${record.id}">刪除</button></td>
         </tr>
@@ -263,6 +485,378 @@ function renderRecords() {
 
   recordsBody.querySelectorAll(".delete-button").forEach((button) => {
     button.addEventListener("click", () => deleteRecord(button.dataset.id));
+  });
+}
+
+function renderPortfolio() {
+  const investmentRecords = getInvestmentRecords();
+
+  portfolioBody.innerHTML = investmentRecords
+    .map((record) => {
+      const market = getRecordMarket(record);
+      const symbol = getRecordSymbol(record);
+      const marketValue = getMarketValue(record);
+      const gain = marketValue === null ? null : marketValue - Number(record.amount);
+      const gainClass = gain === null ? "" : gain >= 0 ? "gain-positive" : "gain-negative";
+
+      return `
+        <tr>
+          <td><span class="type-pill ${market === "us" ? "us-market" : "tw-market"}">${escapeHTML(getMarketLabel(market))}</span></td>
+          <td><strong class="portfolio-symbol">${escapeHTML(symbol)}</strong></td>
+          <td>${formatQuantity(record.quantity)}</td>
+          <td class="amount-cell investment-text">${formatCurrency.format(record.amount)}</td>
+          <td class="amount-cell">${record.marketPrice === null ? "-" : formatMarketCurrency(record.marketPrice)}</td>
+          <td class="amount-cell">${marketValue === null ? "-" : formatMarketCurrency(marketValue)}</td>
+          <td class="amount-cell ${gainClass}">${gain === null ? "-" : formatSignedCurrency(gain)}</td>
+          <td>${escapeHTML(formatMarketTimestamp(record.marketUpdatedAt, record.marketDate))}</td>
+          <td><button class="delete-button" type="button" data-id="${record.id}">刪除</button></td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  portfolioEmptyState.classList.toggle("show", investmentRecords.length === 0);
+
+  portfolioBody.querySelectorAll(".delete-button").forEach((button) => {
+    button.addEventListener("click", () => deleteRecord(button.dataset.id));
+  });
+}
+
+function getInvestmentRecords() {
+  return records.filter((record) => record.type === "investment");
+}
+
+function getPortfolioItems() {
+  const grouped = new Map();
+
+  getInvestmentRecords().forEach((record) => {
+    const market = getRecordMarket(record);
+    const symbol = getRecordSymbol(record);
+    const quantity = normalizeOptionalPositiveNumber(record.quantity);
+
+    if (!symbol || quantity === null) return;
+
+    const key = getMarketSymbolKey(market, symbol);
+    const current = grouped.get(key) || {
+      market,
+      symbol,
+      quantity: 0,
+      cost: 0,
+      marketPrice: null,
+      marketUpdatedAt: "",
+      marketDate: ""
+    };
+
+    current.quantity += quantity;
+    current.cost += Number(record.amount) || 0;
+
+    const marketPrice = normalizeOptionalPositiveNumber(record.marketPrice);
+    if (marketPrice !== null && isNewerTimestamp(record.marketUpdatedAt, current.marketUpdatedAt)) {
+      current.marketPrice = marketPrice;
+      current.marketUpdatedAt = String(record.marketUpdatedAt || "");
+      current.marketDate = String(record.marketDate || "");
+    }
+
+    grouped.set(key, current);
+  });
+
+  return [...grouped.values()].sort((a, b) => getMarketSymbolKey(a.market, a.symbol).localeCompare(getMarketSymbolKey(b.market, b.symbol)));
+}
+
+function getInvestmentStats() {
+  const portfolioItems = getPortfolioItems();
+  const marketValue = portfolioItems.reduce((total, item) => total + (getMarketValue(item) || 0), 0);
+  const pricedCost = portfolioItems.reduce((total, item) => {
+    return item.marketPrice === null ? total : total + item.cost;
+  }, 0);
+
+  return {
+    marketValue,
+    unrealizedGain: marketValue - pricedCost
+  };
+}
+
+function getMarketValue(item) {
+  const quantity = normalizeOptionalPositiveNumber(item.quantity);
+  const marketPrice = normalizeOptionalPositiveNumber(item.marketPrice);
+
+  if (quantity === null || marketPrice === null) return null;
+
+  return quantity * marketPrice;
+}
+
+function getRecordMarket(record) {
+  return normalizeInvestmentMarket(record.market, record.symbol);
+}
+
+function getRecordSymbol(record) {
+  return getCanonicalMarketSymbol(record.symbol, getRecordMarket(record));
+}
+
+function getRecordNote(record) {
+  if (record.type !== "investment") return record.note || "-";
+
+  const details = [];
+  const market = getRecordMarket(record);
+  const symbol = getRecordSymbol(record);
+  const quantity = normalizeOptionalPositiveNumber(record.quantity);
+
+  details.push(getMarketLabel(market));
+  if (symbol) details.push(symbol);
+  if (quantity !== null) details.push(`${formatQuantity(quantity)} 單位`);
+  if (record.note) details.push(record.note);
+
+  return details.join(" / ") || "-";
+}
+
+function isNewerTimestamp(candidate, current) {
+  if (!current) return true;
+  if (!candidate) return false;
+
+  const candidateTime = new Date(candidate).getTime();
+  const currentTime = new Date(current).getTime();
+
+  if (!Number.isFinite(candidateTime)) return false;
+  if (!Number.isFinite(currentTime)) return true;
+
+  return candidateTime >= currentTime;
+}
+
+function saveMarketApiKeyValue() {
+  const twToken = finmindToken.value.trim();
+  const usKey = alphaVantageKey.value.trim();
+
+  if (twToken) {
+    localStorage.setItem(FINMIND_TOKEN_KEY, twToken);
+  } else {
+    localStorage.removeItem(FINMIND_TOKEN_KEY);
+  }
+
+  if (usKey) {
+    localStorage.setItem(ALPHA_VANTAGE_KEY, usKey);
+  } else {
+    localStorage.removeItem(ALPHA_VANTAGE_KEY);
+  }
+
+  updateMarketStatus("市場設定已儲存；台股走 FinMind，美股走 Alpha Vantage。", "success");
+  scheduleAutomaticMarketRefresh();
+}
+
+function getFinMindToken() {
+  return localStorage.getItem(FINMIND_TOKEN_KEY) || "";
+}
+
+function getAlphaVantageKey() {
+  return localStorage.getItem(ALPHA_VANTAGE_KEY) || "";
+}
+
+function updateMarketStatus(message = "", type = "") {
+  if (!message) {
+    message = getAlphaVantageKey()
+      ? "台股走 FinMind，美股走 Alpha Vantage；新增投資時可手動填市價。"
+      : "台股可自動更新；美股請填 Alpha Vantage Key，或在新增投資時手動填市價。";
+  }
+
+  marketStatus.textContent = message;
+  marketStatus.className = `market-status ${type}`.trim();
+}
+
+function scheduleAutomaticMarketRefresh() {
+  if (marketRefreshTimer) {
+    window.clearInterval(marketRefreshTimer);
+    marketRefreshTimer = null;
+  }
+
+  marketRefreshTimer = window.setInterval(() => {
+    refreshMarketPricesFromApi({ silent: true, staleOnly: true });
+  }, MARKET_REFRESH_INTERVAL);
+
+  if (getRefreshableSymbols({ staleOnly: true }).length > 0) {
+    refreshMarketPricesFromApi({ silent: true, staleOnly: true });
+  }
+}
+
+async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, targets = null } = {}) {
+  const tokens = getMarketTokens();
+  const refreshTargets = getRefreshableSymbols({ staleOnly, targets });
+
+  if (refreshTargets.length === 0) {
+    if (!silent) updateMarketStatus("目前沒有可自動更新的代號；美股請先填 Alpha Vantage Key，或在新增投資時手動填市價。");
+    return;
+  }
+
+  refreshMarketPrices.disabled = true;
+  saveMarketApiKey.disabled = true;
+  if (!silent) updateMarketStatus(`正在更新 ${refreshTargets.length} 個投資代號...`);
+
+  let updatedCount = 0;
+  const failures = [];
+
+  try {
+    for (const symbol of refreshTargets) {
+      try {
+        const quote = await fetchMarketQuote(symbol, tokens);
+        updateRecordsForQuote(quote);
+        updatedCount += 1;
+      } catch (error) {
+        failures.push(`${getMarketLabel(symbol.market)} ${symbol.symbol}: ${error.message}`);
+      }
+    }
+
+    if (updatedCount > 0) {
+      saveRecords();
+      renderRecords();
+      renderPortfolio();
+      updateSummary();
+    }
+
+    if (failures.length === 0) {
+      updateMarketStatus(`已更新 ${updatedCount} 個代號，${formatMarketTimestamp(new Date().toISOString())}`, "success");
+    } else if (updatedCount > 0) {
+      updateMarketStatus(`已更新 ${updatedCount} 個，${failures.length} 個失敗：${failures[0]}`, "error");
+    } else {
+      updateMarketStatus(failures[0] || "市價更新失敗，請稍後再試。", "error");
+    }
+  } finally {
+    refreshMarketPrices.disabled = false;
+    saveMarketApiKey.disabled = false;
+  }
+}
+
+function getRefreshableSymbols({ staleOnly = false, targets = null } = {}) {
+  const requestedTargets = targets ? new Set(targets.map((target) => getMarketSymbolKey(target.market, target.symbol))) : null;
+  const result = new Map();
+
+  getInvestmentRecords().forEach((record) => {
+    const market = getRecordMarket(record);
+    const symbol = getRecordSymbol(record);
+    const quantity = normalizeOptionalPositiveNumber(record.quantity);
+    const key = getMarketSymbolKey(market, symbol);
+
+    if (!symbol || quantity === null) return;
+    if (market === "us" && !getAlphaVantageKey()) return;
+    if (market === "tw" && !normalizeTaiwanSymbol(symbol)) return;
+    if (requestedTargets && !requestedTargets.has(key)) return;
+    if (staleOnly && !shouldRefreshRecord(record)) return;
+
+    result.set(key, { market, symbol });
+  });
+
+  return [...result.values()];
+}
+
+function shouldRefreshRecord(record) {
+  if (!getRecordSymbol(record)) return false;
+  if (!record.marketUpdatedAt) return true;
+
+  const updatedAt = new Date(record.marketUpdatedAt).getTime();
+  return !Number.isFinite(updatedAt) || Date.now() - updatedAt >= MARKET_REFRESH_INTERVAL;
+}
+
+async function fetchMarketQuote(target, tokens) {
+  if (target.market === "us") {
+    return fetchAlphaVantageQuote(target.symbol, tokens.alphaVantageKey);
+  }
+
+  return fetchFinMindQuote(target.symbol, tokens.finMindToken);
+}
+
+async function fetchFinMindQuote(symbol, token) {
+  const twSymbol = normalizeTaiwanSymbol(symbol);
+
+  if (!twSymbol) {
+    throw new Error("FinMind 台股模式請使用 0050、2330 這類台股代號。");
+  }
+
+  const today = new Date();
+  const params = new URLSearchParams({
+    dataset: "TaiwanStockPrice",
+    data_id: twSymbol,
+    start_date: toDateInputValue(addDays(today, -14)),
+    end_date: toDateInputValue(today)
+  });
+
+  if (token) {
+    params.set("token", token);
+  }
+
+  const response = await fetch(`https://api.finmindtrade.com/api/v4/data?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("FinMind 暫時無法連線。");
+  }
+
+  const data = await response.json();
+  const rows = Array.isArray(data.data) ? data.data : [];
+  const latest = rows
+    .filter((item) => Number(item.close) > 0)
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .at(-1);
+
+  if (!latest) {
+    throw new Error(data.msg || "FinMind 沒有取得有效市價。");
+  }
+
+  return {
+    market: "tw",
+    symbol: twSymbol,
+    price: Number(latest.close),
+    marketDate: latest.date || "",
+    updatedAt: new Date().toISOString()
+  };
+}
+
+async function fetchAlphaVantageQuote(symbol, key) {
+  if (!key) {
+    throw new Error("美股自動更新需要 Alpha Vantage Key，也可以在新增投資時手動填市價。");
+  }
+
+  const params = new URLSearchParams({
+    function: "GLOBAL_QUOTE",
+    symbol,
+    apikey: key
+  });
+  const response = await fetch(`https://www.alphavantage.co/query?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Alpha Vantage 暫時無法連線。");
+  }
+
+  const data = await response.json();
+
+  if (data.Note) {
+    throw new Error("Alpha Vantage 呼叫太頻繁，請稍後再試。");
+  }
+
+  if (data["Error Message"]) {
+    throw new Error("找不到這個美股代號。");
+  }
+
+  const quote = data["Global Quote"];
+  const price = Number(quote?.["05. price"]);
+
+  if (!quote || !Number.isFinite(price) || price <= 0) {
+    throw new Error(data.Information || "Alpha Vantage 沒有取得有效市價。");
+  }
+
+  return {
+    market: "us",
+    symbol,
+    price,
+    marketDate: quote["07. latest trading day"] || "",
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function updateRecordsForQuote(quote) {
+  records.forEach((record) => {
+    if (record.type !== "investment" || getRecordMarket(record) !== quote.market || !isSameMarketSymbol(getRecordSymbol(record), quote.symbol, quote.market)) return;
+
+    record.market = quote.market;
+    record.symbol = quote.symbol;
+    record.marketPrice = quote.price;
+    record.marketDate = quote.marketDate;
+    record.marketUpdatedAt = quote.updatedAt;
   });
 }
 
@@ -278,13 +872,22 @@ function updateSummary() {
 
   const monthlyIncome = sumByType(monthly, "income");
   const monthlyExpense = sumByType(monthly, "expense");
+  const monthlyInvestment = sumByType(monthly, "investment");
   const totalIncome = sumByType(records, "income");
   const totalExpense = sumByType(records, "expense");
+  const totalInvestment = sumByType(records, "investment");
+  const investmentStats = getInvestmentStats();
 
   document.querySelector("#monthlyIncome").textContent = formatCurrency.format(monthlyIncome);
   document.querySelector("#monthlyExpense").textContent = formatCurrency.format(monthlyExpense);
+  document.querySelector("#monthlyInvestment").textContent = formatCurrency.format(monthlyInvestment);
   document.querySelector("#monthlyBalance").textContent = formatCurrency.format(monthlyIncome - monthlyExpense);
+  document.querySelector("#totalInvestment").textContent = formatCurrency.format(totalInvestment);
   document.querySelector("#totalBalance").textContent = formatCurrency.format(totalIncome - totalExpense);
+  currentMarketValue.textContent = formatMarketCurrency(investmentStats.marketValue);
+  unrealizedGain.textContent = formatSignedCurrency(investmentStats.unrealizedGain);
+  unrealizedGain.className = investmentStats.unrealizedGain >= 0 ? "gain-positive" : "gain-negative";
+  investmentCount.textContent = getInvestmentRecords().length;
 }
 
 function updateAnalytics() {
@@ -315,7 +918,8 @@ function updateAnalytics() {
   });
 
   const forecast = calculateForecast(monthlySeries, currentMonthRecords, today);
-  const uniqueMonths = new Set(records.map((record) => String(record.date).slice(0, 7))).size;
+  const ledgerRecords = records.filter((record) => record.type !== "investment");
+  const uniqueMonths = new Set(ledgerRecords.map((record) => String(record.date).slice(0, 7))).size;
 
   forecastIncome.textContent = formatCurrency.format(forecast.income);
   forecastExpense.textContent = formatCurrency.format(forecast.expense);
@@ -324,7 +928,7 @@ function updateAnalytics() {
   forecastExpenseNote.textContent = forecast.expenseNote;
   forecastBalanceNote.textContent = forecast.balanceNote;
   analysisStatus.textContent =
-    records.length === 0 ? "尚無資料" : `依 ${records.length} 筆、${uniqueMonths} 個月份計算`;
+    ledgerRecords.length === 0 ? "尚無資料" : `依 ${ledgerRecords.length} 筆、${uniqueMonths} 個月份計算`;
 
   renderAnomalyAlerts(today);
   renderBudgetSuggestions(today);
@@ -354,8 +958,7 @@ function updateTrendToggle() {
 }
 
 function restoreAnalyticsPanelState() {
-  const collapsed = localStorage.getItem(ANALYTICS_PANEL_KEY) === "true";
-  setAnalyticsPanelCollapsed(collapsed);
+  setAnalyticsPanelCollapsed(true);
 }
 
 function toggleAnalyticsPanel() {
@@ -373,6 +976,57 @@ function setAnalyticsPanelCollapsed(collapsed) {
   analyticsToggle.setAttribute("aria-expanded", String(!collapsed));
   analyticsToggle.textContent = collapsed ? "展開分析" : "收合分析";
   localStorage.setItem(ANALYTICS_PANEL_KEY, String(collapsed));
+}
+
+function restoreInvestmentPanelState() {
+  setInvestmentPanelCollapsed(true);
+}
+
+function toggleInvestmentPanel() {
+  const shouldCollapse = investmentToggle.getAttribute("aria-expanded") === "true";
+  setInvestmentPanelCollapsed(shouldCollapse);
+}
+
+function setInvestmentPanelCollapsed(collapsed) {
+  investmentContent.hidden = collapsed;
+  investmentPanel.classList.toggle("is-collapsed", collapsed);
+  investmentToggle.setAttribute("aria-expanded", String(!collapsed));
+  investmentToggle.textContent = collapsed ? "展開投資" : "收合投資";
+  localStorage.setItem(INVESTMENT_PANEL_KEY, String(collapsed));
+}
+
+function restoreCategoryPanelState() {
+  setCategoryPanelCollapsed(true);
+}
+
+function toggleCategoryPanel() {
+  const shouldCollapse = categoryToggle.getAttribute("aria-expanded") === "true";
+  setCategoryPanelCollapsed(shouldCollapse);
+}
+
+function setCategoryPanelCollapsed(collapsed) {
+  categoryContent.hidden = collapsed;
+  categoryPanel.classList.toggle("is-collapsed", collapsed);
+  categoryToggle.setAttribute("aria-expanded", String(!collapsed));
+  categoryToggle.textContent = collapsed ? "展開分類清單" : "收合分類清單";
+  localStorage.setItem(CATEGORY_PANEL_KEY, String(collapsed));
+}
+
+function restoreRecordsPanelState() {
+  setRecordsPanelCollapsed(true);
+}
+
+function toggleRecordsPanel() {
+  const shouldCollapse = recordsToggle.getAttribute("aria-expanded") === "true";
+  setRecordsPanelCollapsed(shouldCollapse);
+}
+
+function setRecordsPanelCollapsed(collapsed) {
+  recordsContent.hidden = collapsed;
+  recordsPanel.classList.toggle("is-collapsed", collapsed);
+  recordsToggle.setAttribute("aria-expanded", String(!collapsed));
+  recordsToggle.textContent = collapsed ? "展開明細" : "收合明細";
+  localStorage.setItem(RECORDS_PANEL_KEY, String(collapsed));
 }
 
 function calculateForecast(monthlySeries, currentMonthRecords, today) {
@@ -921,6 +1575,7 @@ function deleteRecord(id) {
   records.splice(index, 1);
   saveRecords();
   renderRecords();
+  renderPortfolio();
   updateSummary();
   updateAnalytics();
 }
@@ -928,15 +1583,38 @@ function deleteRecord(id) {
 function downloadCsv() {
   if (records.length === 0) return;
 
-  const header = ["日期", "類型", "大項目", "細項", "備註", "金額"];
-  const rows = records.map((record) => [
-    record.date,
-    record.type === "income" ? "收入" : "支出",
-    record.main,
-    record.sub,
-    record.note,
-    record.amount
-  ]);
+  const header = [
+    "日期",
+    "類型",
+    "大項目",
+    "細項",
+    "備註",
+    "金額",
+    "市場",
+    "市場代號",
+    "數量",
+    "目前市價",
+    "目前市值",
+    "市價更新時間"
+  ];
+  const rows = records.map((record) => {
+    const marketValue = getMarketValue(record);
+
+    return [
+      record.date,
+      getTypeLabel(record.type),
+      record.main,
+      record.sub,
+      getRecordNote(record),
+      record.amount,
+      record.type === "investment" ? getMarketLabel(getRecordMarket(record)) : "",
+      record.type === "investment" ? getRecordSymbol(record) : "",
+      record.type === "investment" ? record.quantity || "" : "",
+      record.type === "investment" ? record.marketPrice || "" : "",
+      record.type === "investment" && marketValue !== null ? marketValue : "",
+      record.type === "investment" ? formatMarketTimestamp(record.marketUpdatedAt, record.marketDate) : ""
+    ];
+  });
 
   const csv = [header, ...rows].map((row) => row.map(toCsvCell).join(",")).join("\n");
   const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
@@ -993,9 +1671,11 @@ function importBackup(event) {
 
       filterType.value = "all";
       renderCategoryOptions();
+      renderInvestmentOptions();
       filterMain.value = "all";
       renderCategoryList();
       renderRecords();
+      renderPortfolio();
       updateSummary();
       updateAnalytics();
       setBackupStatus(`匯入完成：${records.length} 筆紀錄。`, "success");
@@ -1062,7 +1742,7 @@ function normalizeCategories(rawCategories) {
 function normalizeRecord(record) {
   if (!record || typeof record !== "object") return null;
 
-  const type = record.type === "income" ? "income" : record.type === "expense" ? "expense" : null;
+  const type = normalizeType(record.type);
   const amount = Number(record.amount);
   const date = String(record.date || "").trim();
   const main = String(record.main || "").trim();
@@ -1079,6 +1759,12 @@ function normalizeRecord(record) {
     amount,
     main,
     sub,
+    market: normalizeInvestmentMarket(record.market, record.symbol),
+    symbol: getCanonicalMarketSymbol(record.symbol, normalizeInvestmentMarket(record.market, record.symbol)),
+    quantity: normalizeOptionalPositiveNumber(record.quantity),
+    marketPrice: normalizeOptionalPositiveNumber(record.marketPrice),
+    marketUpdatedAt: String(record.marketUpdatedAt || ""),
+    marketDate: String(record.marketDate || ""),
     note: String(record.note || "").trim().slice(0, 60)
   };
 }
@@ -1099,6 +1785,106 @@ function isDateString(value) {
 function setBackupStatus(message, type = "") {
   backupStatus.textContent = message;
   backupStatus.className = `backup-status ${type}`.trim();
+}
+
+function normalizeType(type) {
+  return ["income", "expense", "investment"].includes(type) ? type : null;
+}
+
+function getTypeLabel(type) {
+  if (type === "income") return "收入";
+  if (type === "investment") return "投資";
+  return "支出";
+}
+
+function getAmountClass(type) {
+  if (type === "income") return "income-text";
+  if (type === "investment") return "investment-text";
+  return "expense-text";
+}
+
+function getAmountSign(type) {
+  if (type === "income") return "+";
+  if (type === "expense") return "-";
+  return "";
+}
+
+function normalizeMarketSymbol(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function normalizeTaiwanSymbol(value) {
+  const symbol = normalizeMarketSymbol(value).replace(/\.(TW|TWO)$/i, "");
+  return /^\d{4,6}$/.test(symbol) ? symbol : "";
+}
+
+function normalizeInvestmentMarket(value, symbol = "") {
+  const market = String(value || "").trim().toLowerCase();
+  if (["tw", "us"].includes(market)) return market;
+  return normalizeTaiwanSymbol(symbol) ? "tw" : "us";
+}
+
+function getCanonicalMarketSymbol(value, market = "") {
+  const symbol = normalizeMarketSymbol(value);
+  return normalizeInvestmentMarket(market, symbol) === "tw" ? normalizeTaiwanSymbol(symbol) || symbol : symbol;
+}
+
+function getMarketSymbolKey(market, symbol) {
+  return `${normalizeInvestmentMarket(market, symbol)}:${getCanonicalMarketSymbol(symbol, market)}`;
+}
+
+function isSameMarketSymbol(left, right, market = "") {
+  return getCanonicalMarketSymbol(left, market) === getCanonicalMarketSymbol(right, market);
+}
+
+function getMarketLabel(market) {
+  return market === "us" ? "美股" : "台股";
+}
+
+function getMarketTokens() {
+  return {
+    finMindToken: getFinMindToken(),
+    alphaVantageKey: getAlphaVantageKey()
+  };
+}
+
+function syncMarketPlaceholders() {
+  const investmentIsUs = investmentMarket.value === "us";
+  investmentSymbol.placeholder = investmentIsUs ? "例如 AAPL、VOO、MSFT" : "例如 0050、2330、006208";
+}
+
+function normalizeOptionalPositiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function formatMarketCurrency(value) {
+  return `$${marketCurrency.format(value || 0)}`;
+}
+
+function formatSignedCurrency(value) {
+  const sign = value >= 0 ? "+" : "-";
+  return `${sign}${formatMarketCurrency(Math.abs(value))}`;
+}
+
+function formatQuantity(value) {
+  return quantityFormatter.format(value || 0);
+}
+
+function formatMarketTimestamp(value, marketDate = "") {
+  if (!value) return marketDate || "-";
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return marketDate || "-";
+
+  const timeText = date.toLocaleString("zh-TW", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+
+  return marketDate ? `${timeText} / 交易日 ${marketDate}` : timeText;
 }
 
 function sumByType(items, type) {

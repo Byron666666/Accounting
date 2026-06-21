@@ -14,6 +14,8 @@
   --income-soft: #e8f7ee;
   --expense: #dc3f4f;
   --expense-soft: #fff0f1;
+  --investment: #2563eb;
+  --investment-soft: #edf4ff;
   --gold: #b7791f;
   --gold-soft: #fff6dc;
   --button-text: #ffffff;
@@ -53,6 +55,13 @@ button {
   cursor: pointer;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 button,
 input,
 select,
@@ -61,6 +70,7 @@ select,
 .entry-panel,
 .category-panel,
 .analytics-panel,
+.investment-panel,
 .records-panel,
 .backup-panel,
 .forecast-card,
@@ -202,7 +212,7 @@ h2 {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -212,6 +222,7 @@ h2 {
 .entry-panel,
 .category-panel,
 .analytics-panel,
+.investment-panel,
 .forecast-card,
 .insight-card,
 .chart-card,
@@ -275,6 +286,14 @@ h2 {
   background: var(--expense-soft);
 }
 
+.summary-card.investment::before {
+  background: var(--investment);
+}
+
+.summary-card.investment::after {
+  background: var(--investment-soft);
+}
+
 .summary-card.total::before {
   background: var(--gold);
 }
@@ -308,6 +327,10 @@ h2 {
   color: var(--expense);
 }
 
+.summary-card.investment strong {
+  color: var(--investment);
+}
+
 .summary-card.balance strong {
   color: var(--brand-dark);
 }
@@ -332,6 +355,29 @@ h2 {
   margin: 6px 0 0;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.category-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.category-content[hidden],
+.records-content[hidden] {
+  display: none;
+}
+
+.category-panel.is-collapsed .category-form {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.records-panel.is-collapsed .records-header {
+  margin-bottom: 0;
 }
 
 .backup-actions {
@@ -367,6 +413,7 @@ h2 {
 .entry-panel,
 .category-panel,
 .analytics-panel,
+.investment-panel,
 .records-panel {
   padding: 22px;
 }
@@ -439,10 +486,18 @@ select:focus {
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
-.two-col {
+.two-col,
+.three-col {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.three-col {
+  grid-template-columns: 0.72fr 1fr 1fr;
 }
 
 .type-switch {
@@ -620,6 +675,187 @@ button.is-pressing,
   font-weight: 900;
 }
 
+.category-tag {
+  padding-right: 6px;
+}
+
+.category-delete {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.12);
+  color: var(--brand-dark);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.category-delete:hover {
+  background: var(--expense-soft);
+  color: var(--expense);
+  transform: scale(1.04);
+}
+
+.investment-panel {
+  margin-top: 18px;
+  background:
+    linear-gradient(135deg, rgba(237, 244, 255, 0.82), rgba(255, 255, 255, 0.96) 36%),
+    var(--panel);
+}
+
+.investment-header {
+  align-items: flex-start;
+}
+
+.investment-header p:not(.section-kicker) {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.market-tools {
+  display: grid;
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.market-tools {
+  grid-template-columns: minmax(210px, 1fr) minmax(210px, 1fr) auto auto minmax(230px, auto);
+  margin-bottom: 14px;
+}
+
+.market-tools button {
+  min-height: 46px;
+}
+
+.market-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  border-radius: 8px;
+  background: var(--investment-soft);
+  color: var(--investment);
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.market-status.success {
+  border-color: rgba(21, 128, 61, 0.18);
+  background: var(--income-soft);
+  color: var(--income);
+}
+
+.market-status.error {
+  border-color: rgba(220, 63, 79, 0.18);
+  background: var(--expense-soft);
+  color: var(--expense);
+}
+
+.investment-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 14px;
+}
+
+.investment-form {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.investment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.form-hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.investment-records {
+  margin-top: 4px;
+}
+
+.records-subheader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+}
+
+.records-subheader h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.98rem;
+}
+
+.records-subheader p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.investment-table-wrap table {
+  min-width: 1020px;
+}
+
+.portfolio-symbol {
+  color: var(--investment);
+  letter-spacing: 0.03em;
+}
+
+.market-settings-panel {
+  margin-top: 18px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(237, 244, 255, 0.7), rgba(255, 255, 255, 0.96) 36%),
+    var(--panel);
+  box-shadow: var(--shadow-soft);
+}
+
+.market-settings-header {
+  align-items: flex-start;
+}
+
+.market-settings-header p:not(.section-kicker) {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.market-settings-panel .market-tools {
+  margin-bottom: 0;
+}
+
+.investment-market-settings {
+  margin: 0 0 14px;
+}
+
 .analytics-panel {
   margin-top: 18px;
   background:
@@ -652,8 +888,15 @@ button.is-pressing,
   margin-bottom: 0;
 }
 
-.analytics-content[hidden] {
+.analytics-content[hidden],
+.investment-content[hidden],
+.category-content[hidden],
+.records-content[hidden] {
   display: none;
+}
+
+.investment-panel.is-collapsed .investment-header {
+  margin-bottom: 0;
 }
 
 .analytics-header p:not(.section-kicker) {
@@ -1041,6 +1284,17 @@ tbody tr:last-child td {
   color: var(--expense);
 }
 
+.type-pill.investment,
+.type-pill.tw-market {
+  background: var(--investment-soft);
+  color: var(--investment);
+}
+
+.type-pill.us-market {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
 .amount-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1053,6 +1307,21 @@ tbody tr:last-child td {
 
 .expense-text {
   color: var(--expense);
+  font-weight: 900;
+}
+
+.investment-text {
+  color: var(--investment);
+  font-weight: 900;
+}
+
+.gain-positive {
+  color: var(--income) !important;
+  font-weight: 900;
+}
+
+.gain-negative {
+  color: var(--expense) !important;
   font-weight: 900;
 }
 
@@ -1090,7 +1359,11 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
-  .forecast-grid {
+  .forecast-grid,
+  .investment-layout,
+  .investment-summary-grid,
+  .market-tools,
+  .three-col {
     grid-template-columns: 1fr;
   }
 
@@ -1109,6 +1382,8 @@ tbody tr:last-child td {
   .topbar,
   .backup-panel,
   .panel-header,
+  .investment-header,
+  .market-settings-header,
   .analytics-header,
   .chart-heading,
   .records-header {
@@ -1128,13 +1403,16 @@ tbody tr:last-child td {
 
   .record-actions,
   .backup-actions,
+  .category-actions,
   .analytics-actions,
+  .market-tools button,
   .collapse-button,
   .chart-tools,
   .expand-button,
   .chart-legend,
   .backup-actions button,
   .backup-actions .file-button,
+  .category-actions button,
   .record-actions select,
   .record-actions button {
     width: 100%;
@@ -1143,11 +1421,17 @@ tbody tr:last-child td {
   .chart-tools {
     justify-items: stretch;
   }
+
+  .records-subheader {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 520px) {
   .summary-grid,
-  .two-col {
+  .two-col,
+  .three-col {
     grid-template-columns: 1fr;
   }
 
@@ -1159,6 +1443,8 @@ tbody tr:last-child td {
   .category-panel,
   .records-panel,
   .analytics-panel,
+  .investment-panel,
+  .market-settings-panel,
   .backup-panel {
     padding: 16px;
   }
