@@ -2,7 +2,8 @@ const STORAGE_KEY = "dailyLedgerRecords";
 const CATEGORY_KEY = "dailyLedgerCategories";
 const FINMIND_TOKEN_KEY = "dailyLedgerFinMindToken";
 const ALPHA_VANTAGE_KEY = "dailyLedgerAlphaVantageKey";
-const MARKET_REFRESH_INTERVAL = 30 * 60 * 1000;
+const MARKET_DAILY_REFRESH_KEY = "dailyLedgerMarketDailyRefreshDate";
+const MARKET_REFRESH_CHECK_INTERVAL = 60 * 60 * 1000;
 
 const defaultCategories = {
   餐飲: ["早餐", "午餐", "晚餐", "飲料", "聚餐"],
@@ -536,6 +537,8 @@ function renderPortfolio() {
     .map((record) => {
       const market = getRecordMarket(record);
       const symbol = getRecordSymbol(record);
+      const quantity = normalizeOptionalPositiveNumber(record.quantity);
+      const averageCost = getAverageCost(record);
       const marketValue = getMarketValue(record);
       const gain = marketValue === null ? null : marketValue - Number(record.amount);
       const gainClass = gain === null ? "" : gain >= 0 ? "gain-positive" : "gain-negative";
@@ -544,8 +547,9 @@ function renderPortfolio() {
         <tr>
           <td><span class="type-pill ${market === "us" ? "us-market" : "tw-market"}">${escapeHTML(getMarketLabel(market))}</span></td>
           <td><strong class="portfolio-symbol">${escapeHTML(symbol)}</strong></td>
-          <td>${formatQuantity(record.quantity)}</td>
+          <td>${quantity === null ? "-" : formatQuantity(quantity)}</td>
           <td class="amount-cell investment-text">${formatCurrency.format(record.amount)}</td>
+          <td class="amount-cell">${averageCost === null ? "-" : formatMarketCurrency(averageCost)}</td>
           <td class="amount-cell">${record.marketPrice === null ? "-" : formatMarketCurrency(record.marketPrice)}</td>
           <td class="amount-cell">${marketValue === null ? "-" : formatMarketCurrency(marketValue)}</td>
           <td class="amount-cell ${gainClass}">${gain === null ? "-" : formatSignedCurrency(gain)}</td>
@@ -626,6 +630,15 @@ function getMarketValue(item) {
   return quantity * marketPrice;
 }
 
+function getAverageCost(record) {
+  const amount = Number(record.amount);
+  const quantity = normalizeOptionalPositiveNumber(record.quantity);
+
+  if (!Number.isFinite(amount) || amount <= 0 || quantity === null) return null;
+
+  return amount / quantity;
+}
+
 function getRecordMarket(record) {
   return normalizeInvestmentMarket(record.market, record.symbol);
 }
@@ -679,7 +692,8 @@ function saveMarketApiKeyValue() {
     localStorage.removeItem(ALPHA_VANTAGE_KEY);
   }
 
-  updateMarketStatus("市場設定已儲存；台股走 FinMind，美股走 Alpha Vantage。", "success");
+  localStorage.removeItem(MARKET_DAILY_REFRESH_KEY);
+  updateMarketStatus("市場設定已儲存；今天會重新檢查可更新的投資代號。", "success");
   scheduleAutomaticMarketRefresh();
 }
 
@@ -694,8 +708,8 @@ function getAlphaVantageKey() {
 function updateMarketStatus(message = "", type = "") {
   if (!message) {
     message = getAlphaVantageKey()
-      ? "台股走 FinMind，美股走 Alpha Vantage；新增投資時可手動填市價。"
-      : "台股可自動更新；美股請填 Alpha Vantage Key，或在新增投資時手動填市價。";
+      ? "每天開啟網站會自動批次更新投資市價；也可以按「立即更新全部」。"
+      : "每天會自動更新台股；美股若不填 Alpha Vantage Key，仍可手動填市價。";
   }
 
   marketStatus.textContent = message;
@@ -708,16 +722,20 @@ function scheduleAutomaticMarketRefresh() {
     marketRefreshTimer = null;
   }
 
-  marketRefreshTimer = window.setInterval(() => {
-    refreshMarketPricesFromApi({ silent: true, staleOnly: true });
-  }, MARKET_REFRESH_INTERVAL);
-
-  if (getRefreshableSymbols({ staleOnly: true }).length > 0) {
-    refreshMarketPricesFromApi({ silent: true, staleOnly: true });
-  }
+  marketRefreshTimer = window.setInterval(refreshDailyMarketPrices, MARKET_REFRESH_CHECK_INTERVAL);
+  refreshDailyMarketPrices();
 }
 
-async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, targets = null } = {}) {
+function refreshDailyMarketPrices() {
+  const todayKey = getDateKey(new Date());
+
+  if (localStorage.getItem(MARKET_DAILY_REFRESH_KEY) === todayKey) return;
+  if (getRefreshableSymbols({ staleOnly: true }).length === 0) return;
+
+  refreshMarketPricesFromApi({ silent: true, staleOnly: true, markDaily: true });
+}
+
+async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, targets = null, markDaily = false } = {}) {
   const tokens = getMarketTokens();
   const refreshTargets = getRefreshableSymbols({ staleOnly, targets });
 
@@ -759,6 +777,10 @@ async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, t
       updateMarketStatus(failures[0] || "市價更新失敗，請稍後再試。", "error");
     }
   } finally {
+    if (markDaily) {
+      localStorage.setItem(MARKET_DAILY_REFRESH_KEY, getDateKey(new Date()));
+    }
+
     refreshMarketPrices.disabled = false;
     saveMarketApiKey.disabled = false;
   }
@@ -790,8 +812,10 @@ function shouldRefreshRecord(record) {
   if (!getRecordSymbol(record)) return false;
   if (!record.marketUpdatedAt) return true;
 
-  const updatedAt = new Date(record.marketUpdatedAt).getTime();
-  return !Number.isFinite(updatedAt) || Date.now() - updatedAt >= MARKET_REFRESH_INTERVAL;
+  const updatedAt = new Date(record.marketUpdatedAt);
+  if (!Number.isFinite(updatedAt.getTime())) return true;
+
+  return getDateKey(updatedAt) !== getDateKey(new Date());
 }
 
 async function fetchMarketQuote(target, tokens) {
@@ -918,13 +942,14 @@ function updateSummary() {
   const totalExpense = sumByType(records, "expense");
   const totalInvestment = sumByType(records, "investment");
   const investmentStats = getInvestmentStats();
+  const totalAssets = totalIncome - totalExpense - totalInvestment + investmentStats.marketValue;
 
   document.querySelector("#monthlyIncome").textContent = formatCurrency.format(monthlyIncome);
   document.querySelector("#monthlyExpense").textContent = formatCurrency.format(monthlyExpense);
   document.querySelector("#monthlyInvestment").textContent = formatCurrency.format(monthlyInvestment);
-  document.querySelector("#monthlyBalance").textContent = formatCurrency.format(monthlyIncome - monthlyExpense);
+  document.querySelector("#monthlyBalance").textContent = formatCurrency.format(totalInvestment);
   document.querySelector("#totalInvestment").textContent = formatCurrency.format(totalInvestment);
-  document.querySelector("#totalBalance").textContent = formatCurrency.format(totalIncome - totalExpense);
+  document.querySelector("#totalBalance").textContent = formatCurrency.format(totalAssets);
   currentMarketValue.textContent = formatMarketCurrency(investmentStats.marketValue);
   unrealizedGain.textContent = formatSignedCurrency(investmentStats.unrealizedGain);
   unrealizedGain.className = investmentStats.unrealizedGain >= 0 ? "gain-positive" : "gain-negative";
@@ -1648,6 +1673,7 @@ function downloadCsv() {
     "市場",
     "市場代號",
     "數量",
+    "平均成本",
     "目前市價",
     "目前市值",
     "市價更新時間"
@@ -1665,6 +1691,7 @@ function downloadCsv() {
       record.type === "investment" ? getMarketLabel(getRecordMarket(record)) : "",
       record.type === "investment" ? getRecordSymbol(record) : "",
       record.type === "investment" ? record.quantity || "" : "",
+      record.type === "investment" ? getAverageCost(record) || "" : "",
       record.type === "investment" ? record.marketPrice || "" : "",
       record.type === "investment" && marketValue !== null ? marketValue : "",
       record.type === "investment" ? formatMarketTimestamp(record.marketUpdatedAt, record.marketDate) : ""
@@ -1733,6 +1760,8 @@ function importBackup(event) {
       renderPortfolio();
       updateSummary();
       updateAnalytics();
+      localStorage.removeItem(MARKET_DAILY_REFRESH_KEY);
+      scheduleAutomaticMarketRefresh();
       setBackupStatus(`匯入完成：${records.length} 筆紀錄。`, "success");
     } catch (error) {
       setBackupStatus("匯入失敗，請確認是本站匯出的 JSON 備份檔。", "error");

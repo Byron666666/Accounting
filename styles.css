@@ -312,9 +312,11 @@ h2 {
 .summary-card span {
   position: relative;
   z-index: 1;
+  max-width: calc(100% - 48px);
   color: var(--muted);
   font-size: 0.9rem;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .summary-card strong {
@@ -467,6 +469,7 @@ h2 {
 
 label {
   display: grid;
+  min-width: 0;
   gap: 8px;
   color: var(--muted);
   font-size: 0.9rem;
@@ -475,7 +478,10 @@ label {
 
 input,
 select {
+  display: block;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 46px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -506,6 +512,19 @@ select:focus {
   box-shadow:
     0 0 0 4px rgba(15, 139, 141, 0.14),
     inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+input[type="date"] {
+  min-width: 0;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  line-height: 1.2;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  min-height: 1.2em;
+  text-align: left;
 }
 
 .two-col,
@@ -849,7 +868,7 @@ button.is-pressing,
 }
 
 .investment-table-wrap table {
-  min-width: 1020px;
+  min-width: 1120px;
 }
 
 .portfolio-symbol {
@@ -1511,8 +1530,21 @@ tbody tr:last-child td {
     min-height: 98px;
   }
 
+  .summary-card span {
+    max-width: 100%;
+  }
+
   .summary-card strong {
     font-size: 1.5rem;
+  }
+
+  input,
+  select {
+    font-size: 16px;
+  }
+
+  input[type="date"] {
+    padding-right: 10px;
   }
 
   .category-list {
@@ -1533,7 +1565,7 @@ tbody tr:last-child td {
   }
 
   .investment-table-wrap table {
-    min-width: 920px;
+    min-width: 1020px;
   }
 
   .chart-card canvas {

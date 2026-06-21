@@ -31,11 +31,11 @@
           <strong id="monthlyExpense">$0</strong>
         </article>
         <article class="summary-card balance">
-          <span>本月結餘</span>
+          <span>投資總額</span>
           <strong id="monthlyBalance">$0</strong>
         </article>
         <article class="summary-card total">
-          <span>累積結餘</span>
+          <span>總資產</span>
           <strong id="totalBalance">$0</strong>
         </article>
       </section>
@@ -165,19 +165,19 @@
                 <input id="investmentSymbol" type="text" maxlength="20" placeholder="例如 0050、2330、006208" required />
               </label>
               <label>
-                持有數量
-                <input id="investmentQuantity" type="number" min="0.000001" step="0.000001" placeholder="例如 10" required />
+                持有數量（股數 / 單位）
+                <input id="investmentQuantity" type="number" min="0.000001" step="0.000001" placeholder="例如 32" required />
               </label>
             </div>
 
             <div class="two-col">
               <label>
-                投入金額
-                <input id="investmentAmount" type="number" min="1" step="1" placeholder="例如 5000" required />
+                投入成本（總金額）
+                <input id="investmentAmount" type="number" min="1" step="1" placeholder="例如 3456" required />
               </label>
               <label>
-                目前市價（可選）
-                <input id="investmentMarketPrice" type="number" min="0.000001" step="0.000001" placeholder="手動估損益用" />
+                目前市價（每股 / 單位，可選）
+                <input id="investmentMarketPrice" type="number" min="0.000001" step="0.000001" placeholder="例如 107.3" />
               </label>
             </div>
 
@@ -186,7 +186,7 @@
               <input id="investmentNote" type="text" maxlength="60" placeholder="例如 0050、2330、VOO、AAPL" />
             </label>
 
-            <p class="form-hint">切到台股可用 0050、2330；切到美股可用 AAPL、VOO。可在「目前市價」手動輸入當下價格來估損益。</p>
+            <p class="form-hint">市值 = 持有數量 × 每股市價；損益 = 市值 - 投入成本。</p>
 
             <button class="primary-button" type="submit">加入投資</button>
           </form>
@@ -220,7 +220,7 @@
                   <div>
                     <p class="section-kicker">市場更新設定</p>
                     <h2>FinMind / Alpha Vantage</h2>
-                    <p>台股走 FinMind，美股走 Alpha Vantage；Key 只存在這個瀏覽器。</p>
+                    <p>每天開啟網站會自動批次更新已記錄代號；美股 Key 只存在這個瀏覽器。</p>
                   </div>
                 </div>
         
@@ -234,8 +234,8 @@
                     <input id="alphaVantageKey" type="password" placeholder="美股自動更新需要" autocomplete="off" />
                   </label>
                   <button class="ghost-button" id="saveMarketApiKey" type="button">儲存設定</button>
-                  <button class="secondary-button" id="refreshMarketPrices" type="button">自動更新</button>
-                  <span class="market-status" id="marketStatus" aria-live="polite">台股用 FinMind，美股用 Alpha Vantage；手動市價可在新增投資時填入</span>
+                  <button class="secondary-button" id="refreshMarketPrices" type="button">立即更新全部</button>
+                  <span class="market-status" id="marketStatus" aria-live="polite">每天開啟網站會自動更新；美股若沒有 Key 可先用手動市價</span>
                 </div>
               </section>
 
@@ -252,6 +252,7 @@
                   <th>代號</th>
                   <th>數量</th>
                   <th class="amount-cell">投入成本</th>
+                  <th class="amount-cell">平均成本</th>
                   <th class="amount-cell">目前市價</th>
                   <th class="amount-cell">目前市值</th>
                   <th class="amount-cell">未實現損益</th>
