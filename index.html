@@ -381,21 +381,6 @@
         </div>
       </section>
 
-      <section class="backup-panel" aria-label="備份與還原">
-        <div>
-          <h2>備份與還原</h2>
-          <p>完整備份會保存所有記帳明細和自訂分類。</p>
-        </div>
-        <div class="backup-actions">
-          <button class="secondary-button" id="exportBackup" type="button">匯出完整備份</button>
-          <label class="file-button">
-            匯入備份
-            <input id="importBackupFile" type="file" accept=".json,application/json" />
-          </label>
-          <span class="backup-status" id="backupStatus" aria-live="polite"></span>
-        </div>
-      </section>
-
       <section class="records-panel" id="recordsPanel">
         <div class="panel-header records-header">
           <h2>記帳明細</h2>
@@ -440,6 +425,21 @@
           </table>
           <div class="empty-state" id="emptyState">還沒有紀錄，先新增一筆收支吧。</div>
         </div>
+        </div>
+      </section>
+
+      <section class="backup-panel" aria-label="備份與還原">
+        <div>
+          <h2>備份與還原</h2>
+          <p>完整備份會保存所有記帳明細和自訂分類。</p>
+        </div>
+        <div class="backup-actions">
+          <button class="secondary-button" id="exportBackup" type="button">匯出完整備份</button>
+          <label class="file-button">
+            匯入備份
+            <input id="importBackupFile" type="file" accept=".json,application/json" />
+          </label>
+          <span class="backup-status" id="backupStatus" aria-live="polite"></span>
         </div>
       </section>
     </main>

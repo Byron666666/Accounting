@@ -1354,6 +1354,7 @@ button.is-pressing,
   border: 1px solid var(--line);
   border-radius: 8px;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 table {
@@ -1580,22 +1581,39 @@ tbody tr:last-child td {
     align-items: stretch;
     flex-direction: column;
   }
+
+  .insight-card,
+  .chart-card {
+    padding: 16px;
+  }
+
+  .asset-pie-canvas {
+    height: clamp(230px, 58vw, 270px);
+  }
+
+  .chart-card canvas {
+    height: 280px;
+  }
 }
 
 @media (max-width: 520px) {
   .app-shell {
     width: 100%;
-    padding: 12px 12px 36px;
+    padding: 10px 10px 34px;
   }
 
-  .summary-grid,
+  .summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
   .two-col,
   .three-col {
     grid-template-columns: 1fr;
   }
 
   h1 {
-    font-size: 1.86rem;
+    font-size: 1.68rem;
   }
 
   h2 {
@@ -1609,19 +1627,41 @@ tbody tr:last-child td {
   .investment-panel,
   .market-settings-panel,
   .backup-panel {
-    padding: 16px;
+    padding: 14px;
+  }
+
+  .topbar {
+    padding: 18px;
+  }
+
+  .panel-header,
+  .insight-heading,
+  .chart-heading {
+    gap: 10px;
+    margin-bottom: 12px;
   }
 
   .summary-card {
-    min-height: 98px;
+    min-height: 92px;
+    padding: 14px 12px 12px 14px;
   }
 
   .summary-card span {
     max-width: 100%;
+    font-size: 0.82rem;
   }
 
   .summary-card strong {
-    font-size: 1.5rem;
+    font-size: 1.28rem;
+  }
+
+  .forecast-card {
+    min-height: 108px;
+    padding: 14px;
+  }
+
+  .forecast-card strong {
+    font-size: 1.32rem;
   }
 
   input,
@@ -1642,6 +1682,14 @@ tbody tr:last-child td {
     grid-template-columns: 1fr;
   }
 
+  .asset-pie-canvas {
+    height: clamp(218px, 64vw, 248px);
+  }
+
+  .asset-row {
+    padding: 9px 10px;
+  }
+
   .analysis-status,
   .market-status,
   .chart-legend {
@@ -1651,16 +1699,29 @@ tbody tr:last-child td {
 
   .table-wrap table,
   table {
-    min-width: 660px;
+    min-width: 620px;
   }
 
   .investment-table-wrap table {
-    min-width: 1020px;
+    min-width: 940px;
   }
 
-  .asset-pie-canvas,
   .chart-card canvas {
-    height: 280px;
+    height: 250px;
+  }
+}
+
+@media (max-width: 380px) {
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .asset-pie-canvas {
+    height: 212px;
+  }
+
+  .chart-card canvas {
+    height: 230px;
   }
 }
 

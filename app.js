@@ -1289,9 +1289,10 @@ function drawAssetPieChart() {
 
   assetPieChartNote.textContent = `合計 ${formatCurrency.format(chartTotal)}，依市價、收入與支出細分。`;
 
-  const radius = Math.min(width, height) * 0.32;
+  const isCompact = width <= 430;
+  const radius = Math.min(width, height) * (isCompact ? 0.28 : 0.32);
   const centerX = width / 2;
-  const centerY = height / 2 + 4;
+  const centerY = height / 2 + (isCompact ? 12 : 4);
   let startAngle = -Math.PI / 2;
 
   slices.forEach((slice) => {
@@ -1308,12 +1309,12 @@ function drawAssetPieChart() {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    if (sliceAngle > 0.38) {
+    if (sliceAngle > (isCompact ? 0.55 : 0.38)) {
       const middleAngle = startAngle + sliceAngle / 2;
       const labelX = centerX + Math.cos(middleAngle) * radius * 0.58;
       const labelY = centerY + Math.sin(middleAngle) * radius * 0.58;
       ctx.fillStyle = slice.textColor;
-      ctx.font = "900 13px sans-serif";
+      ctx.font = `900 ${isCompact ? 11 : 13}px sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(`${Math.round((slice.value / chartTotal) * 100)}%`, labelX, labelY);
@@ -1323,13 +1324,13 @@ function drawAssetPieChart() {
   });
 
   ctx.fillStyle = getThemeColor("--text");
-  ctx.font = "900 14px sans-serif";
+  ctx.font = `900 ${isCompact ? 12 : 14}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  ctx.fillText("市價 / 收入 / 支出", centerX, 18);
+  ctx.fillText("市價 / 收入 / 支出", centerX, isCompact ? 12 : 18);
   ctx.fillStyle = getThemeColor("--chart-muted");
-  ctx.font = "12px sans-serif";
-  ctx.fillText(formatCurrency.format(chartTotal), centerX, 40);
+  ctx.font = `${isCompact ? 11 : 12}px sans-serif`;
+  ctx.fillText(formatCurrency.format(chartTotal), centerX, isCompact ? 32 : 40);
 }
 
 function getAssetPieSlices(summary) {
@@ -1652,8 +1653,8 @@ function renderEmptyInsight(message) {
 function prepareCanvas(canvas) {
   const ratio = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
-  const width = Math.max(320, Math.floor(rect.width || canvas.width));
-  const height = Math.max(240, Math.floor(rect.height || canvas.height));
+  const width = Math.max(280, Math.floor(rect.width || canvas.width));
+  const height = Math.max(220, Math.floor(rect.height || canvas.height));
   const ctx = canvas.getContext("2d");
 
   canvas.width = Math.floor(width * ratio);
