@@ -1186,6 +1186,87 @@ button.is-pressing,
   text-align: center;
 }
 
+.asset-card {
+  display: grid;
+  gap: 12px;
+}
+
+.asset-pie-canvas {
+  display: block;
+  width: 100%;
+  height: 280px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--chart-bg);
+}
+
+.asset-breakdown {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.asset-row {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(96, 113, 125, 0.14);
+  border-radius: 8px;
+  background: var(--panel-soft);
+}
+
+.asset-row span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.asset-row strong {
+  color: var(--text);
+  font-size: 0.98rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.asset-row small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.asset-row.total {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.asset-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+}
+
+.asset-row.cash strong,
+.asset-row.gain strong {
+  color: var(--income);
+}
+
+.asset-row.investment strong,
+.asset-row.cost strong {
+  color: var(--investment);
+}
+
+.asset-row.loss strong {
+  color: var(--expense);
+}
+
 .chart-card {
   overflow: hidden;
 }
@@ -1347,6 +1428,11 @@ tbody tr:last-child td {
 .type-pill.us-market {
   background: var(--gold-soft);
   color: var(--gold);
+}
+
+.type-pill.crypto-market {
+  background: var(--brand-soft);
+  color: var(--brand-dark);
 }
 
 .amount-cell {
@@ -1552,6 +1638,10 @@ tbody tr:last-child td {
     padding-right: 0;
   }
 
+  .asset-breakdown {
+    grid-template-columns: 1fr;
+  }
+
   .analysis-status,
   .market-status,
   .chart-legend {
@@ -1568,6 +1658,7 @@ tbody tr:last-child td {
     min-width: 1020px;
   }
 
+  .asset-pie-canvas,
   .chart-card canvas {
     height: 280px;
   }

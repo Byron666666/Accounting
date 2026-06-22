@@ -125,7 +125,7 @@
           <div>
             <p class="section-kicker">投資管理</p>
             <h2>投資投入與市價追蹤</h2>
-            <p>投資紀錄會合併到明細，可切換台股 / 美股，自動更新來源會跟著切換。</p>
+            <p>投資紀錄會合併到明細，可切換台股、美股或加密貨幣；加密貨幣會用 CoinGecko 更新台幣市價。</p>
           </div>
           <button
             class="collapse-button"
@@ -147,6 +147,7 @@
                 <select id="investmentMarket" required>
                   <option value="tw">台股</option>
                   <option value="us">美股</option>
+                  <option value="crypto">加密貨幣</option>
                 </select>
               </label>
               <label>
@@ -166,18 +167,18 @@
               </label>
               <label>
                 持有數量（股數 / 單位）
-                <input id="investmentQuantity" type="number" min="0.000001" step="0.000001" placeholder="例如 32" required />
+                <input id="investmentQuantity" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 0.005 或 32" required />
               </label>
             </div>
 
             <div class="two-col">
               <label>
                 投入成本（總金額）
-                <input id="investmentAmount" type="number" min="1" step="1" placeholder="例如 3456" required />
+                <input id="investmentAmount" type="number" min="1" step="any" inputmode="decimal" placeholder="例如 3456" required />
               </label>
               <label>
                 目前市價（每股 / 單位，可選）
-                <input id="investmentMarketPrice" type="number" min="0.000001" step="0.000001" placeholder="例如 107.3" />
+                <input id="investmentMarketPrice" type="number" min="0" step="any" inputmode="decimal" placeholder="例如 107.3" />
               </label>
             </div>
 
@@ -186,7 +187,7 @@
               <input id="investmentNote" type="text" maxlength="60" placeholder="例如 0050、2330、VOO、AAPL" />
             </label>
 
-            <p class="form-hint">市值 = 持有數量 × 每股市價；損益 = 市值 - 投入成本。</p>
+            <p class="form-hint">市值 = 持有數量 × 每股 / 單位市價；台股請填股數，1 張 = 1000 股。</p>
 
             <button class="primary-button" type="submit">加入投資</button>
           </form>
@@ -219,7 +220,7 @@
                 <div class="panel-header market-settings-header">
                   <div>
                     <p class="section-kicker">市場更新設定</p>
-                    <h2>FinMind / Alpha Vantage</h2>
+                    <h2>FinMind / Alpha Vantage / CoinGecko</h2>
                     <p>每天開啟網站會自動批次更新已記錄代號；美股 Key 只存在這個瀏覽器。</p>
                   </div>
                 </div>
@@ -235,7 +236,7 @@
                   </label>
                   <button class="ghost-button" id="saveMarketApiKey" type="button">儲存設定</button>
                   <button class="secondary-button" id="refreshMarketPrices" type="button">立即更新全部</button>
-                  <span class="market-status" id="marketStatus" aria-live="polite">每天開啟網站會自動更新；美股若沒有 Key 可先用手動市價</span>
+                  <span class="market-status" id="marketStatus" aria-live="polite">每天開啟網站會自動更新台股 / 美股 / 加密貨幣</span>
                 </div>
               </section>
 
@@ -272,7 +273,7 @@
         <div class="panel-header analytics-header">
           <div>
             <p class="section-kicker">分析洞察</p>
-            <h2>月底預測、異常提醒與預算建議</h2>
+            <h2>月底預測、資產配置與預算建議</h2>
             <p>依據目前瀏覽器內的記帳資料估算，不會上傳任何資料。</p>
           </div>
           <div class="analytics-actions">
@@ -309,12 +310,22 @@
         </div>
 
         <div class="insight-grid">
-          <section class="insight-card">
+          <section class="insight-card asset-card">
             <div class="insight-heading">
-              <h3>異常支出提醒</h3>
-              <span>和過去月份平均比較</span>
+              <div>
+                <h3>市價、收入、支出圓餅圖</h3>
+                <span id="assetPieChartNote">市價、收入與支出比例</span>
+              </div>
             </div>
-            <div class="insight-list" id="anomalyList"></div>
+            <canvas
+              class="asset-pie-canvas"
+              id="assetPieChart"
+              width="520"
+              height="300"
+              role="img"
+              aria-label="市價、收入、支出圓餅圖"
+            ></canvas>
+            <div class="asset-breakdown" id="assetBreakdown"></div>
           </section>
 
           <section class="insight-card">

@@ -4,6 +4,18 @@ const FINMIND_TOKEN_KEY = "dailyLedgerFinMindToken";
 const ALPHA_VANTAGE_KEY = "dailyLedgerAlphaVantageKey";
 const MARKET_DAILY_REFRESH_KEY = "dailyLedgerMarketDailyRefreshDate";
 const MARKET_REFRESH_CHECK_INTERVAL = 60 * 60 * 1000;
+const CRYPTO_REFRESH_STALE_INTERVAL = 60 * 60 * 1000;
+const CRYPTO_SYMBOL_IDS = {
+  BTC: "bitcoin",
+  ETH: "ethereum",
+  SOL: "solana",
+  BNB: "binancecoin",
+  XRP: "ripple",
+  ADA: "cardano",
+  DOGE: "dogecoin",
+  USDT: "tether",
+  USDC: "usd-coin"
+};
 
 const defaultCategories = {
   餐飲: ["早餐", "午餐", "晚餐", "飲料", "聚餐"],
@@ -71,7 +83,9 @@ const forecastBalance = document.querySelector("#forecastBalance");
 const forecastIncomeNote = document.querySelector("#forecastIncomeNote");
 const forecastExpenseNote = document.querySelector("#forecastExpenseNote");
 const forecastBalanceNote = document.querySelector("#forecastBalanceNote");
-const anomalyList = document.querySelector("#anomalyList");
+const assetPieChart = document.querySelector("#assetPieChart");
+const assetPieChartNote = document.querySelector("#assetPieChartNote");
+const assetBreakdown = document.querySelector("#assetBreakdown");
 const budgetList = document.querySelector("#budgetList");
 const trendChart = document.querySelector("#trendChart");
 const paretoChart = document.querySelector("#paretoChart");
@@ -104,12 +118,20 @@ const compactCurrency = new Intl.NumberFormat("zh-TW", {
   maximumFractionDigits: 1
 });
 
-const marketCurrency = new Intl.NumberFormat("zh-TW", {
-  maximumFractionDigits: 2
-});
+const marketCurrencyFormatters = {
+  whole: new Intl.NumberFormat("zh-TW", {
+    maximumFractionDigits: 0
+  }),
+  decimal: new Intl.NumberFormat("zh-TW", {
+    maximumFractionDigits: 2
+  }),
+  precise: new Intl.NumberFormat("zh-TW", {
+    maximumFractionDigits: 8
+  })
+};
 
 const quantityFormatter = new Intl.NumberFormat("zh-TW", {
-  maximumFractionDigits: 6
+  maximumFractionDigits: 10
 });
 
 migrateCategories();
@@ -545,7 +567,7 @@ function renderPortfolio() {
 
       return `
         <tr>
-          <td><span class="type-pill ${market === "us" ? "us-market" : "tw-market"}">${escapeHTML(getMarketLabel(market))}</span></td>
+          <td><span class="type-pill ${getMarketPillClass(market)}">${escapeHTML(getMarketLabel(market))}</span></td>
           <td><strong class="portfolio-symbol">${escapeHTML(symbol)}</strong></td>
           <td>${quantity === null ? "-" : formatQuantity(quantity)}</td>
           <td class="amount-cell investment-text">${formatCurrency.format(record.amount)}</td>
@@ -708,8 +730,8 @@ function getAlphaVantageKey() {
 function updateMarketStatus(message = "", type = "") {
   if (!message) {
     message = getAlphaVantageKey()
-      ? "每天開啟網站會自動批次更新投資市價；也可以按「立即更新全部」。"
-      : "每天會自動更新台股；美股若不填 Alpha Vantage Key，仍可手動填市價。";
+      ? "每天開啟網站會自動批次更新台股 / 美股 / 加密貨幣；也可以按「立即更新全部」。"
+      : "每天會自動更新台股與加密貨幣；美股若不填 Alpha Vantage Key，仍可手動填台幣市價。";
   }
 
   marketStatus.textContent = message;
@@ -728,11 +750,20 @@ function scheduleAutomaticMarketRefresh() {
 
 function refreshDailyMarketPrices() {
   const todayKey = getDateKey(new Date());
+  const refreshedToday = localStorage.getItem(MARKET_DAILY_REFRESH_KEY) === todayKey;
+  const refreshTargets = getRefreshableSymbols({ staleOnly: true });
 
-  if (localStorage.getItem(MARKET_DAILY_REFRESH_KEY) === todayKey) return;
-  if (getRefreshableSymbols({ staleOnly: true }).length === 0) return;
+  if (refreshTargets.length === 0) return;
 
-  refreshMarketPricesFromApi({ silent: true, staleOnly: true, markDaily: true });
+  const targets = refreshedToday ? refreshTargets.filter((target) => target.market === "crypto") : refreshTargets;
+  if (targets.length === 0) return;
+
+  refreshMarketPricesFromApi({
+    silent: true,
+    staleOnly: true,
+    targets,
+    markDaily: !refreshedToday && targets.some((target) => target.market !== "crypto")
+  });
 }
 
 async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, targets = null, markDaily = false } = {}) {
@@ -740,7 +771,7 @@ async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, t
   const refreshTargets = getRefreshableSymbols({ staleOnly, targets });
 
   if (refreshTargets.length === 0) {
-    if (!silent) updateMarketStatus("目前沒有可自動更新的代號；美股請先填 Alpha Vantage Key，或在新增投資時手動填市價。");
+    if (!silent) updateMarketStatus("目前沒有可自動更新的代號；美股請先填 Alpha Vantage Key，或手動填台幣市價。");
     return;
   }
 
@@ -767,6 +798,7 @@ async function refreshMarketPricesFromApi({ silent = false, staleOnly = false, t
       renderRecords();
       renderPortfolio();
       updateSummary();
+      updateAnalytics();
     }
 
     if (failures.length === 0) {
@@ -815,6 +847,10 @@ function shouldRefreshRecord(record) {
   const updatedAt = new Date(record.marketUpdatedAt);
   if (!Number.isFinite(updatedAt.getTime())) return true;
 
+  if (getRecordMarket(record) === "crypto") {
+    return Date.now() - updatedAt.getTime() >= CRYPTO_REFRESH_STALE_INTERVAL;
+  }
+
   return getDateKey(updatedAt) !== getDateKey(new Date());
 }
 
@@ -823,7 +859,52 @@ async function fetchMarketQuote(target, tokens) {
     return fetchAlphaVantageQuote(target.symbol, tokens.alphaVantageKey);
   }
 
+  if (target.market === "crypto") {
+    return fetchCoinGeckoQuote(target.symbol);
+  }
+
   return fetchFinMindQuote(target.symbol, tokens.finMindToken);
+}
+
+async function fetchCoinGeckoQuote(symbol) {
+  const canonicalSymbol = normalizeMarketSymbol(symbol);
+  const coinId = CRYPTO_SYMBOL_IDS[canonicalSymbol] || "";
+  const params = new URLSearchParams({
+    vs_currencies: "twd",
+    include_last_updated_at: "true",
+    precision: "full"
+  });
+
+  if (coinId) {
+    params.set("ids", coinId);
+  } else {
+    params.set("symbols", canonicalSymbol.toLowerCase());
+    params.set("include_tokens", "top");
+  }
+
+  const response = await fetch(`https://api.coingecko.com/api/v3/simple/price?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("CoinGecko 暫時無法連線。");
+  }
+
+  const data = await response.json();
+  const quote = coinId ? data[coinId] : data[canonicalSymbol.toLowerCase()];
+  const price = quote ? Number(quote.twd) : NaN;
+
+  if (!quote || !Number.isFinite(price) || price <= 0) {
+    throw new Error("CoinGecko 沒有取得有效加密貨幣價格。");
+  }
+
+  const updatedAt = Number(quote.last_updated_at);
+
+  return {
+    market: "crypto",
+    symbol: canonicalSymbol,
+    price,
+    marketDate: Number.isFinite(updatedAt) && updatedAt > 0 ? new Date(updatedAt * 1000).toISOString().slice(0, 10) : "",
+    updatedAt: Number.isFinite(updatedAt) && updatedAt > 0 ? new Date(updatedAt * 1000).toISOString() : new Date().toISOString()
+  };
 }
 
 async function fetchFinMindQuote(symbol, token) {
@@ -942,14 +1023,14 @@ function updateSummary() {
   const totalExpense = sumByType(records, "expense");
   const totalInvestment = sumByType(records, "investment");
   const investmentStats = getInvestmentStats();
-  const totalAssets = totalIncome - totalExpense - totalInvestment + investmentStats.marketValue;
+  const assetSummary = getAssetSummary();
 
   document.querySelector("#monthlyIncome").textContent = formatCurrency.format(monthlyIncome);
   document.querySelector("#monthlyExpense").textContent = formatCurrency.format(monthlyExpense);
   document.querySelector("#monthlyInvestment").textContent = formatCurrency.format(monthlyInvestment);
   document.querySelector("#monthlyBalance").textContent = formatCurrency.format(totalInvestment);
   document.querySelector("#totalInvestment").textContent = formatCurrency.format(totalInvestment);
-  document.querySelector("#totalBalance").textContent = formatCurrency.format(totalAssets);
+  document.querySelector("#totalBalance").textContent = formatCurrency.format(assetSummary.totalAssets);
   currentMarketValue.textContent = formatMarketCurrency(investmentStats.marketValue);
   unrealizedGain.textContent = formatSignedCurrency(investmentStats.unrealizedGain);
   unrealizedGain.className = investmentStats.unrealizedGain >= 0 ? "gain-positive" : "gain-negative";
@@ -985,6 +1066,7 @@ function updateAnalytics() {
 
   const forecast = calculateForecast(monthlySeries, currentMonthRecords, today);
   const ledgerRecords = records.filter((record) => record.type !== "investment");
+  const investmentRecords = getInvestmentRecords();
   const uniqueMonths = new Set(ledgerRecords.map((record) => String(record.date).slice(0, 7))).size;
 
   forecastIncome.textContent = formatCurrency.format(forecast.income);
@@ -994,9 +1076,11 @@ function updateAnalytics() {
   forecastExpenseNote.textContent = forecast.expenseNote;
   forecastBalanceNote.textContent = forecast.balanceNote;
   analysisStatus.textContent =
-    ledgerRecords.length === 0 ? "尚無資料" : `依 ${ledgerRecords.length} 筆、${uniqueMonths} 個月份計算`;
+    ledgerRecords.length === 0 && investmentRecords.length === 0
+      ? "尚無資料"
+      : `依 ${ledgerRecords.length} 筆收支、${investmentRecords.length} 筆投資計算`;
 
-  renderAnomalyAlerts(today);
+  drawAssetPieChart();
   renderBudgetSuggestions(today);
   drawTrendChart(dailySeries);
   drawParetoChart(getExpenseTotalsByCategory(currentMonthRecords));
@@ -1157,55 +1241,160 @@ function describeForecast(type, currentAmount, averageAmount) {
   return "需要更多資料才會更準。";
 }
 
-function renderAnomalyAlerts(today) {
-  const currentMonthKey = getMonthKey(today);
-  const historyKeys = getPreviousMonthKeys(5, today);
-  const currentExpenses = getExpenseTotalsByCategory(getRecordsForMonth(currentMonthKey));
-  const alerts = Object.entries(currentExpenses)
-    .map(([category, amount]) => {
-      const pastAmounts = historyKeys.map((monthKey) => {
-        const monthlyExpenses = getExpenseTotalsByCategory(getRecordsForMonth(monthKey));
-        return monthlyExpenses[category] || 0;
-      });
-      const averageAmount = averagePositive(pastAmounts);
-      const overAmount = amount - averageAmount;
-      const overRate = averageAmount > 0 ? overAmount / averageAmount : 0;
+function getAssetSummary() {
+  const totalIncome = sumByType(records, "income");
+  const totalExpense = sumByType(records, "expense");
+  const totalInvestment = sumByType(records, "investment");
+  const investmentItems = getPortfolioItems().map((item) => ({
+    ...item,
+    marketValue: getMarketValue(item)
+  }));
+  const investmentMarketValue = investmentItems.reduce((total, item) => total + (item.marketValue || 0), 0);
+  const pricedInvestmentCost = investmentItems.reduce((total, item) => {
+    return item.marketValue === null ? total : total + item.cost;
+  }, 0);
+  const unpricedInvestmentCost = investmentItems.reduce((total, item) => {
+    return item.marketValue === null ? total + item.cost : total;
+  }, 0);
+  const cashBalance = totalIncome - totalExpense;
 
-      return {
-        category,
-        amount,
-        averageAmount,
-        overAmount,
-        overRate,
-        historyCount: pastAmounts.filter((value) => value > 0).length
-      };
+  return {
+    totalIncome,
+    totalExpense,
+    cashBalance,
+    investmentCost: totalInvestment,
+    investmentMarketValue,
+    investmentItems,
+    unpricedInvestmentCost,
+    unrealizedGain: investmentMarketValue - pricedInvestmentCost,
+    totalAssets: cashBalance + investmentMarketValue
+  };
+}
+
+function drawAssetPieChart() {
+  const canvasState = prepareCanvas(assetPieChart);
+  const { ctx, width, height } = canvasState;
+  const summary = getAssetSummary();
+  const slices = getAssetPieSlices(summary);
+  const chartTotal = slices.reduce((total, item) => total + item.value, 0);
+
+  drawChartFrame(ctx, width, height);
+  renderAssetBreakdown(summary);
+
+  if (chartTotal <= 0) {
+    assetPieChartNote.textContent = "新增市價、收入或支出後，會顯示三者比例。";
+    drawEmptyChart(ctx, width, height, "還沒有可繪製的資產資料");
+    return;
+  }
+
+  assetPieChartNote.textContent = `合計 ${formatCurrency.format(chartTotal)}，依市價、收入與支出細分。`;
+
+  const radius = Math.min(width, height) * 0.32;
+  const centerX = width / 2;
+  const centerY = height / 2 + 4;
+  let startAngle = -Math.PI / 2;
+
+  slices.forEach((slice) => {
+    const sliceAngle = (slice.value / chartTotal) * Math.PI * 2;
+    const endAngle = startAngle + sliceAngle;
+
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    ctx.closePath();
+    ctx.fillStyle = slice.color;
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    if (sliceAngle > 0.38) {
+      const middleAngle = startAngle + sliceAngle / 2;
+      const labelX = centerX + Math.cos(middleAngle) * radius * 0.58;
+      const labelY = centerY + Math.sin(middleAngle) * radius * 0.58;
+      ctx.fillStyle = slice.textColor;
+      ctx.font = "900 13px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`${Math.round((slice.value / chartTotal) * 100)}%`, labelX, labelY);
+    }
+
+    startAngle = endAngle;
+  });
+
+  ctx.fillStyle = getThemeColor("--text");
+  ctx.font = "900 14px sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillText("市價 / 收入 / 支出", centerX, 18);
+  ctx.fillStyle = getThemeColor("--chart-muted");
+  ctx.font = "12px sans-serif";
+  ctx.fillText(formatCurrency.format(chartTotal), centerX, 40);
+}
+
+function getAssetPieSlices(summary) {
+  return [
+    {
+      label: "市價",
+      value: Math.max(0, summary.investmentMarketValue),
+      color: getThemeColor("--investment"),
+      textColor: "#ffffff"
+    },
+    {
+      label: "收入",
+      value: Math.max(0, summary.totalIncome),
+      color: getThemeColor("--income"),
+      textColor: "#ffffff"
+    },
+    {
+      label: "支出",
+      value: Math.max(0, summary.totalExpense),
+      color: getThemeColor("--expense"),
+      textColor: "#ffffff"
+    }
+  ].filter((item) => item.value > 0);
+}
+
+function renderAssetBreakdown(summary) {
+  const rows = [
+    {
+      label: "市價",
+      value: summary.investmentMarketValue,
+      className: "investment",
+      signed: false,
+      color: summary.investmentMarketValue > 0 ? getThemeColor("--investment") : ""
+    },
+    {
+      label: "收入",
+      value: summary.totalIncome,
+      className: "cash",
+      signed: false,
+      color: summary.totalIncome > 0 ? getThemeColor("--income") : ""
+    },
+    {
+      label: "支出",
+      value: summary.totalExpense,
+      className: "loss",
+      signed: false,
+      color: summary.totalExpense > 0 ? getThemeColor("--expense") : ""
+    }
+  ];
+
+  assetBreakdown.innerHTML = rows
+    .map((row) => {
+      const colorDot = row.color
+        ? `<i class="asset-dot" style="background: ${escapeHTML(row.color)}" aria-hidden="true"></i>`
+        : "";
+      const detail = row.detail ? `<small>${escapeHTML(row.detail)}</small>` : "";
+
+      return `
+        <div class="asset-row ${row.className}">
+          <span>${colorDot}${escapeHTML(row.label)}</span>
+          <strong>${row.signed ? formatSignedCurrency(row.value) : formatCurrency.format(row.value)}</strong>
+          ${detail}
+        </div>
+      `;
     })
-    .filter((item) => item.historyCount >= 2 && item.overAmount >= 500 && item.overRate >= 0.35)
-    .sort((a, b) => b.overRate - a.overRate)
-    .slice(0, 4);
-
-  if (Object.keys(currentExpenses).length === 0) {
-    anomalyList.innerHTML = renderEmptyInsight("本月還沒有支出紀錄，暫時沒有異常可比較。");
-    return;
-  }
-
-  if (alerts.length === 0) {
-    anomalyList.innerHTML = renderEmptyInsight("目前沒有明顯異常支出；累積更多月份後會更準。");
-    return;
-  }
-
-  anomalyList.innerHTML = alerts
-    .map(
-      (item) => `
-        <article class="insight-item warning">
-          <div>
-            <strong>${escapeHTML(item.category)}</strong>
-            <span>比過去月均 ${formatCurrency.format(item.averageAmount)} 高 ${Math.round(item.overRate * 100)}%。</span>
-          </div>
-          <em>${formatCurrency.format(item.amount)}</em>
-        </article>
-      `
-    )
     .join("");
 }
 
@@ -1904,7 +2093,7 @@ function normalizeTaiwanSymbol(value) {
 
 function normalizeInvestmentMarket(value, symbol = "") {
   const market = String(value || "").trim().toLowerCase();
-  if (["tw", "us"].includes(market)) return market;
+  if (["tw", "us", "crypto"].includes(market)) return market;
   return normalizeTaiwanSymbol(symbol) ? "tw" : "us";
 }
 
@@ -1922,7 +2111,13 @@ function isSameMarketSymbol(left, right, market = "") {
 }
 
 function getMarketLabel(market) {
+  if (market === "crypto") return "加密貨幣";
   return market === "us" ? "美股" : "台股";
+}
+
+function getMarketPillClass(market) {
+  if (market === "crypto") return "crypto-market";
+  return market === "us" ? "us-market" : "tw-market";
 }
 
 function getMarketTokens() {
@@ -1933,8 +2128,19 @@ function getMarketTokens() {
 }
 
 function syncMarketPlaceholders() {
-  const investmentIsUs = investmentMarket.value === "us";
+  const market = investmentMarket.value;
+
+  if (market === "crypto") {
+    investmentSymbol.placeholder = "例如 BTC、ETH";
+    investmentQuantity.placeholder = "例如 0.005";
+    investmentMarketPrice.placeholder = "可留空自動更新";
+    return;
+  }
+
+  const investmentIsUs = market === "us";
   investmentSymbol.placeholder = investmentIsUs ? "例如 AAPL、VOO、MSFT" : "例如 0050、2330、006208";
+  investmentQuantity.placeholder = investmentIsUs ? "例如 0.005 或 1.25" : "例如 900（股數，不是張數）";
+  investmentMarketPrice.placeholder = investmentIsUs ? "請填台幣換算後市價" : "例如 107.3";
 }
 
 function normalizeOptionalPositiveNumber(value) {
@@ -1943,7 +2149,16 @@ function normalizeOptionalPositiveNumber(value) {
 }
 
 function formatMarketCurrency(value) {
-  return `$${marketCurrency.format(value || 0)}`;
+  const number = Number(value) || 0;
+  const abs = Math.abs(number);
+  const formatter =
+    abs >= 1000 || abs === 0
+      ? marketCurrencyFormatters.whole
+      : abs >= 1
+        ? marketCurrencyFormatters.decimal
+        : marketCurrencyFormatters.precise;
+
+  return `$${formatter.format(number)}`;
 }
 
 function formatSignedCurrency(value) {
